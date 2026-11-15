@@ -1,0 +1,23 @@
+{
+  "name": "unisync-ai",
+  "version": "0.0.0",
+  "private": true,
+  "description": "UniSync AI — Intelligent Academic Coordination & Personalized Student Support",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @unisync/web dev",
+    "build:web": "pnpm --filter @unisync/web build",
+    "lint:web": "pnpm --filter @unisync/web lint",
+    "typecheck:web": "pnpm --filter @unisync/web typecheck",
+    "lint:api": "cd apps/api && python -m ruff check .",
+    "format:api": "cd apps/api && python -m ruff format .",
+    "typecheck:api": "cd apps/api && python -m mypy app",
+    "test:api": "cd apps/api && python -m pytest",
+    "lint": "pnpm run lint:api && pnpm run lint:web",
+    "typecheck": "pnpm run typecheck:api && pnpm run typecheck:web",
+    "test": "pnpm run test:api",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test"
+  }
+}
