@@ -48,7 +48,7 @@ What does not exist: any route, any middleware, any service, `refresh_tokens`,
 | Config | `app/core/config.py` — settings include `jwt_signing_key`, `audit_hmac_key`, TTLs, role names | No rate-limit, cookie-domain, idle-timeout or step-up settings |
 | DB session | `app/db/session.py` — `tenant_session()` with `set_config(..., true)`, `assert_runtime_role()`, `assert_url_uses_runtime_role()` | No dependency wiring; nothing calls it from HTTP |
 | RLS | 17 tables, `ENABLE`+`FORCE`, single `tenant_isolation` policy each | `institutions` is readable only with a tenant set — blocks login (§3.1) |
-| Auth tables | `users` with `password_hash`, `perm_version`, `failed_login_count`, `locked_until` | **No `refresh_tokens`, `password_reset_tokens`, `last_step_up_at`** |
+| Auth tables | `users` holds `password_hash`, `failed_login_count`, `locked_until` **today**; ADR-28 relocates all three to `auth_user_credentials` | **No `refresh_tokens`, `password_reset_tokens`, `auth_user_credentials`, `last_step_up_at`** |
 | Audit | **None** | `audit_logs` / `record_access_log` absent |
 | API | `app/main.py` — `/healthz` only | No routers, middleware, error envelope, or auth dependency |
 | Tests | 50 passing: 4 unit, 21 tenancy, 25 academic | No auth, authorization, or service tests |
@@ -229,7 +229,7 @@ INSTITUTION_CODE_PEPPER_ACTIVE = 2
 |---|---|
 | `unisync_owner` | owner (migrations) |
 | `unisync_auth` | `SELECT (user_id, institution_id, password_hash, failed_login_count, locked_until, credential_version)` · `UPDATE (failed_login_count, locked_until)` |
-| `unisync_credential_writer` *(ADR-29, proposed)* | `UPDATE (password_hash, password_changed_at, credential_version)` — **no `SELECT`** |
+| `unisync_credential_writer` *(ADR-29 — approved)* | `UPDATE (password_hash, password_changed_at, credential_version)` — **no `SELECT`** |
 | `unisync_app` | **none** |
 
 The auth role therefore **cannot replace a password hash**. It can read hashes (it must, to verify)
@@ -303,9 +303,10 @@ sequenceDiagram
         A-->>C: 401 invalid credentials
     else digest found
         AP->>DB: set_config('app.auth_institution_id', id, true)
-        AP->>DB: SELECT id, institution_id, password_hash, is_active,
-                 perm_version, failed_login_count, locked_until
-                 FROM users WHERE email=$2 AND institution_id=id
+        AP->>DB: SELECT u.id, u.institution_id, u.is_active, u.perm_version,
+                 c.password_hash, c.failed_login_count, c.locked_until
+                 FROM users u JOIN auth_user_credentials c ON c.user_id=u.id
+                 WHERE u.email=$2 AND u.institution_id=id
         AP->>AP: Argon2id verify / lockout counters
         AP->>DB: COMMIT
         A->>PP: BEGIN  (verified institution_id)
@@ -328,15 +329,16 @@ POST /api/v1/auth/login  { institution_code, email, password }
          ORDER BY is_current DESC LIMIT 1
        └ none → dummy Argon2 → 401 (identical body and comparable timing)
     b. set_config('app.auth_institution_id', <id>, true)
-    c. SELECT id, institution_id, password_hash, is_active, perm_version,
-              failed_login_count, locked_until
-         FROM users WHERE email = $2 AND institution_id = <id>
+    c. SELECT u.id, u.institution_id, u.is_active, u.perm_version,
+              c.password_hash, c.failed_login_count, c.locked_until
+         FROM users u JOIN auth_user_credentials c ON c.user_id = u.id
+        WHERE u.email = $2 AND u.institution_id = <id>
        └ absent → dummy Argon2 → 401
     d. locked_until > now() → 429 + Retry-After (no password check)
     e. Argon2id verify. On failure: failed_login_count += 1 (atomic UPDATE … RETURNING),
        locked_until per backoff → 401
     f. is_active = false → 401 (identical body; suspension is not disclosed)
-    g. success: failed_login_count = 0, last_login_at = now()
+    g. success: c.failed_login_count = 0 on auth_user_credentials; u.last_login_at = now() on users
     h. COMMIT — the auth connection returns to the AUTH pool
  4. APP POOL, tenant transaction — institution_id is now *verified*, not claimed:
     set_config('app.institution_id', <id>, true)
@@ -374,6 +376,58 @@ from same-site XHR.
 **No token is ever returned in a JSON body.** A response-body token would land in logs, APM traces
 and any XSS-accessible scope — the exact defect C-03 corrected.
 
+### 3.3.1 `refresh_tokens` schema (G4 — previously undefined)
+
+Owned by `unisync_owner`; tenant-scoped; written and read only by the app pool.
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | uuid | no | PK, UUIDv7 |
+| `user_id` | uuid | no | FK `(user_id, institution_id)` → `users(id, institution_id)` |
+| `institution_id` | uuid | no | tenant pinning |
+| `family_id` | uuid | no | one family per login; all rotations share it |
+| `family_created_at` | timestamptz | no | copied from the first row; anchors the **30-day absolute** lifetime |
+| `token_hash` | bytea | no | SHA-256 of the opaque cookie value — the plaintext token is never stored |
+| `issued_at` | timestamptz | no | `now()` |
+| `expires_at` | timestamptz | no | `issued_at + 7 d` for normal rotation |
+| `used_at` | timestamptz | yes | set when the token is redeemed |
+| `replaced_by` | uuid | yes | FK → `refresh_tokens(id)`; the successor issued on redemption |
+| `revoked_at` | timestamptz | yes | family revocation (logout, reuse, password change, suspension) |
+| `last_seen_at` | timestamptz | no | `now()`; drives the **8-hour sliding idle** timeout |
+| `ip` | inet | yes | |
+| `user_agent` | text | yes | |
+
+Constraints: `UNIQUE (token_hash)` · `CHECK (expires_at > issued_at)` ·
+`CHECK (used_at IS NULL OR used_at >= issued_at)`.
+
+Indexes: `(family_id)` · `(user_id, family_id)` · partial `(expires_at) WHERE revoked_at IS NULL`
+for the cleanup job.
+
+**Semantics — the four rules that were previously prose only**
+
+| Rule | Definition |
+|---|---|
+| **Family** | Created at login (`family_id`, `family_created_at`). Every rotation inserts a successor with the same `family_id` and the same `family_created_at`. Revoking a family sets `revoked_at` on all its rows |
+| **Rotation** | `UPDATE … SET used_at = now() WHERE token_hash = $1 AND used_at IS NULL RETURNING id` — compare-and-set. The winner inserts the successor and sets `replaced_by`; a loser that loses the race falls into the grace path |
+| **Successor recovery (10 s grace)** | If `used_at IS NOT NULL` and `now() - used_at < 10 s`, follow `replaced_by` and return the **same** successor pair. Beyond 10 s, treat as replay |
+| **Replay detection** | `used_at IS NOT NULL` beyond the grace window, or a revoked/expired row → revoke the entire family, write `auth.refresh_reuse`, return 401 |
+| **Idle timeout** | Refuse when `now() - last_seen_at > 8 h`; a successful refresh sets `last_seen_at = now()` |
+| **Absolute lifetime** | Refuse when `now() - family_created_at > 30 d`, regardless of activity; reauthentication required |
+
+**Concurrency.** `SELECT … FOR UPDATE` on the token row serialises two refreshes of the *same* token.
+The compare-and-set on `used_at` is the authoritative gate; `FOR UPDATE` only prevents two waiters
+from both observing `used_at IS NULL`.
+
+**Cleanup.** A scheduled job deletes rows where `expires_at < now() - 30 d` or
+`revoked_at < now() - 30 d`. Deletion is safe: a deleted token is indistinguishable from an unknown
+one (401), and family revocation is recorded in the audit ledger.
+
+**Q15 — open.** `refresh_tokens` is RLS-protected, but the refresh endpoint arrives with no JWT and
+therefore no tenant. A lookup path must be chosen before implementation: (a) a token-hash-scoped
+policy (`USING (token_hash = current_setting('app.refresh_token_hash', true))`), which follows the
+existing accident-protection pattern; (b) service the lookup on the auth pool, which requires new
+grants; or (c) move session records out of the tenant-scoped model. **Not decided here.**
+
 ### 3.4 Refresh rotation and reuse detection
 
 ```mermaid
@@ -403,9 +457,9 @@ sequenceDiagram
 **P3 — 10-second grace window.** Without it, two tabs refreshing simultaneously trip reuse
 detection and log the user out — a denial of service an attacker can trigger by racing the browser.
 With it, the second request is idempotently served from the recorded successor. The window is short
-enough that a genuinely stolen token replayed later still revokes the family. **Q2 — is 10 s the
-right value?** It must exceed worst-case client retry latency and stay well below human-perceptible
-reuse.
+enough that a genuinely stolen token replayed later still revokes the family. **Q2 resolved
+2026-11-16: 10 seconds, approved.** It exceeds worst-case client retry latency and stays well below
+human-perceptible reuse.
 
 `SELECT ... FOR UPDATE` on the token row serialises concurrent refreshes of the *same* token.
 
@@ -418,7 +472,8 @@ reuse.
 | Password reset | All families revoked; `perm_version += 1` |
 | `is_active = false` | All families revoked; `perm_version += 1`; refresh returns 401 |
 | Reactivation | `perm_version += 1`; user logs in again |
-| Idle timeout | Refresh refused when `last_seen_at < now() - interval` (**Q3 — 8 h recommended**) |
+| Idle timeout | **8 h sliding** (approved). Refresh refused when `last_seen_at < now() - 8 hours`; a successful refresh updates `last_seen_at` |
+| Absolute lifetime | **30 d non-sliding** (approved). Refresh refused when `now() - family.created_at > 30 days`, regardless of activity. The user must reauthenticate |
 
 **Access tokens are not revocable individually** (15-minute lifetime). Revocation therefore relies on
 `perm_version`: every request compares the token's `pv` to `users.perm_version`. A stale token is
@@ -440,12 +495,20 @@ rejected within one request, not within 15 minutes. This is why the JWT is cheap
 enumeration. If the user exists and is active: insert a `password_reset_tokens` row with a hashed
 token, 30-minute expiry, single use, and deliver it through the `Notifier` interface.
 
-**Q4 — there is no email infrastructure.** MVP uses a console/file notifier; the token is written to
-the API log in development only, gated by `ENV != production`. That is a real operational gap, not a
-finished feature, and must be labelled as such in the UI.
+**Q4 resolved 2026-11-16.** The console/file notifier is **development-only**. In production the
+service must refuse to start with a console notifier configured (startup guard: `ENV=production` with
+the console notifier is a fatal configuration error), so a reset token can never be written to a
+production log. The UI labels the feature unavailable when no production notifier is configured.
 
-`POST /auth/password/reset { token, new_password }` → validates hash, single-use, expiry; updates
-`password_hash` (Argon2id); revokes all families; `perm_version += 1`; audits.
+**Q10 — production provider undecided.** Delivery in production requires a provider decision at
+deployment time. The code commits only to a **provider-independent `Notifier` interface** —
+`send_password_reset(to, token, expires_at)` — with the implementation chosen behind it. This design
+selects no provider, and password reset must not be advertised as available in production until one
+exists.
+
+`POST /auth/password/reset { token, new_password }` → validates hash, single-use, expiry; the new hash
+is written through the credential-writer path (§3.1.5), not by the auth role; all families revoked;
+`perm_version += 1`; audited.
 
 **Argon2id parameters:** `m=65536` (64 MiB), `t=3`, `p=4`, 16-byte salt, 32-byte output, PHC string
 in `password_hash`. On successful login, if the stored parameters are below current policy, rehash
@@ -577,7 +640,7 @@ flowchart TB
 | Idle-in-transaction timeout | 10 s | 10 s |
 | Transaction scope | one login/refresh attempt | one HTTP request |
 | GUC it may set | `app.auth_institution_id` **only** | `app.institution_id` **only** |
-| Writes | `users.failed_login_count`, `locked_until`, `last_login_at` | all academic tables via services |
+| Writes | `auth_user_credentials.failed_login_count`, `locked_until` (ADR-28); `users.last_login_at` | all academic tables via services |
 | Must never | read academic tables, write audit, issue tokens | read credential digests, set `auth_institution_id` |
 
 **Startup guards** (both run before the first request, as `assert_runtime_role()` already does):
@@ -638,8 +701,9 @@ CREATE POLICY auth_credential_lookup ON users
 ```
 
 Column-level grants keep it minimal: `SELECT (id, institution_id, email, is_active, perm_version)`
-and `UPDATE (failed_login_count, locked_until, last_login_at)`. No `full_name`, no role list, **no
-`password_hash`** (ADR-28 moves it to `auth_user_credentials`), and no academic table.
+and `UPDATE (last_login_at)`. Lockout counters are **not** on `users` — they live in
+`auth_user_credentials` (ADR-28), and the password hash is read from that table, never from
+`users`. No `full_name`, no role list, and no academic table.
 
 #### 4.3.1 What `app.auth_institution_id` does and does not protect
 
@@ -678,7 +742,7 @@ flowchart TD
 2. `BYPASSRLS` for the auth role — strictly worse; it removes even the accidental-query protection.
 3. A parameterised view — a view cannot take a runtime parameter without a GUC or a function, so it
    collapses into (1).
-4. **ADR-28 (recommended): move `password_hash` out of `users` into `auth_user_credentials`.** This
+4. **ADR-28 (approved):** move `password_hash` out of `users` into `auth_user_credentials`. This
    does not stop a compromised auth role from reading hashes — a verifier must read them — but it
    removes hash access from `unisync_app`, which today can `SELECT *` on `users` inside its tenant.
 
@@ -774,23 +838,24 @@ Conflating these is how "faculty can see their students" becomes "faculty can se
 | `SELF` | actor is the student |
 | `INSTRUCTOR` | actor is the `faculty` row that owns the offering |
 | `ADVISOR` | **active** `advisor_assignments` row (`ended_at IS NULL`) for the student |
-| `DEPT_ADMIN` | **Q6 — needs a modelling decision** |
+| `DEPT_ADMIN` | **Deferred** (Q6) — ADR-20 remains proposed and is not in MVP |
 | `ADMIN` | `users.role = 'admin'` |
 
-**Q6 — department administrator does not exist in the schema.** The role enum is
-`(admin, faculty, student)`. Two options:
+**Q6 resolved 2026-11-16: department administrators are deferred.** The role enum stays
+`(admin, faculty, student)` for MVP; ADR-20 (`department_admins`) remains **Proposed** and is not
+implemented. The `DEPT_ADMIN` column in the matrix below is future-facing only.
 
-- **P5 (recommended):** a `department_admins(user_id, department_id)` table. Roles stay as approved;
-  department authority becomes a *scope*. Smaller blast radius than widening an enum that appears in
-  RLS predicates, JWTs and every policy branch.
-- **P6:** add `department_admin` to `user_role`. Simpler queries, but widens a type that is already
-  load-bearing and needs a migration either way.
+**Q7 resolved 2026-11-16: counselling/student-support staff are in MVP.** They are a first-class
+scope, not an add-on. The approved requirement is: a dedicated authorization scope, assignment-based
+access, counselling records separated from the academic record, field-level redaction, and a
+sensitive-access audit event.
 
-Either needs approval and a migration; neither is assumed here.
-
-**Q7 — counselling/support staff** are explicitly out of scope in v2 §1.5. The redaction matrix
-already denies interventions to `INSTRUCTOR`; a future `COUNSELLOR` scope would read interventions
-and write notes, but never marks or enrolment. Not modelled now.
+**The detailed counselling architecture is deliberately not specified here.** It is pending
+**Phase 1.5B**, which must define the scope name, the assignment model, the record separation
+mechanism, the redaction matrix column, and the audit event. This document does not invent
+counsellor permissions, a counselling schema, assignment constraints, consent models, retention rules
+or sharing policy. Until 1.5B lands, **no `COUNSELLOR` column is added to the permission matrix** and
+no counselling endpoint is designed.
 
 ### 5.3 Permission matrix
 
@@ -1234,24 +1299,24 @@ the exact new expectation, never removed.
 
 | Step | Scope | Gate |
 |---|---|---|
-| 2.0a | Bootstrap: create `unisync_auth` (`LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`), add `DATABASE_URL_AUTH` and the pepper to the environment template | role attributes verified; app role unchanged |
-| 2.0b | Migration 0003: `institution_code_digests`, `refresh_tokens`, `password_reset_tokens`, `users.last_step_up_at`, the auth-only `users` policy, all grants/revokes, and — if P9 is approved — `institutions.code` → `slug` | catalogue + grant matrix verified; RLS tests still pass |
+| 2.0a | Bootstrap: create **two** roles — `unisync_auth` (`LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`) and `unisync_credential_writer` (`LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE`, ADR-29); add `DATABASE_URL_AUTH`, the credential-writer DSN and the pepper to the environment template | role attributes verified; app role unchanged |
+| 2.0b | Migration 0003: `institution_code_digests`, `auth_user_credentials`, `refresh_tokens`, `password_reset_tokens`, **`audit_logs`**, **`audit_chain_checkpoints`**, `users.last_step_up_at`; drop `users.password_hash`, `failed_login_count`, `locked_until`; the auth-only `users` policy; all grants/revokes; `institutions.code` → `slug` | catalogue + grant matrix verified; RLS tests still pass |
 | 2.1 | Config + error envelope + middleware (request id, security headers, CORS) | header tests |
 | 2.2 | `policies/` — Actor, scopes, `authorize()`, 404/403 rule | unit tests, no DB |
 | 2.3 | Auth service + `/auth/*` routes | §11.1 suite |
-| 2.4 | Session dependency + actor loading (P4) | §11.3 suite |
+| 2.4 | Session dependency + actor loading (**ADR-21 / O1**: verified claim selects provisional scope, `users` row is authoritative) | §11.3 suite |
 | 2.5 | Term / subject / offering services + routes | invariant tests I1–I3, I9 |
 | 2.6 | Enrolment + attendance services + routes (I4, I10) | concurrency test |
 | 2.7 | Assessment / marks / assignment / submission services + routes (I8) | invariant tests |
 | 2.8 | Student profile + redaction serialisers | §11.2 suite |
 | 2.9 | `AgentContext` (no agents, no LLM) + import-linter contract | §11.5 suite |
-| 2.10 | Audit service (depends on Q8 decision) | audit tests |
+| 2.10 | Audit service (ADR-23 approved; ledger tables arrive in 0003) | audit tests |
 
 Nothing in steps 2.0–2.10 implements an agent or calls a model.
 
 ---
 
-## 13. ADR proposals (not approved)
+## 13. ADR register
 
 Status vocabulary: **Approved** · **Approved with conditions** · **Proposed** · **Rejected** · **Superseded**.
 Status is recorded from the reviewer's explicit language, never inferred from the fact that an ADR is
@@ -1262,20 +1327,22 @@ Proposed.
 | # | Decision | Status | Conditions | Dependencies | Must happen before implementation |
 |---|---|---|---|---|---|
 | **ADR-18** | ~~Institution-code lookup via an additive `SELECT` policy on `institutions` keyed on `app.login_institution_code`~~ | **Rejected** → superseded by ADR-24 | — | — | Nothing; A1 stays removed from the design. Kept for history. |
-| **ADR-19** | Request-scoped unit of work owns the transaction; services never commit | **Proposed** | — | — | Explicit approval |
+| **ADR-19** | Request-scoped unit of work owns the transaction; services never commit | **Approved 2026-11-16** | Services never call `commit()`; the request dependency owns the GUC and the transaction | — | Unit-of-work dependency used by every service route |
 | **ADR-20** | Department authority as a `department_admins` table, not a new enum value | **Proposed** | — | migration 0003 | Approval; table + scope resolution |
 | **ADR-21** | **Provisional-selector vs authoritative-membership.** The verified `inst` claim selects a *provisional* tenant scope for the initial identity lookup only; the `users` row is authoritative for membership and revocation, and a failed cross-check aborts before any service runs | **Approved 2026-11-16** (Q14 resolved as O1) | (1) Signature and claims verified before any claim is read; (2) cross-check mandatory in the same transaction; (3) no service reachable on a provisional tenant; (4) reassignment must bump `perm_version` | ADR-19 (unit of work) | Signature verification, in-transaction cross-check, and a regression test for the tautology are implemented |
-| **ADR-22** | Refresh rotation with a 10 s idempotent grace window | **Proposed** | Grace window value pending Q2 | — | Approval + duration confirmation |
-| **ADR-23** | Authentication audit pathway: app-pool writer, ordered after credential verification, with a fail-closed gate | **Proposed** (revised in this audit) | No audit grants to `unisync_auth`; 503 `audit_unavailable` on audit failure; **no atomicity claim** across pools; failed-login audit failure also 503 | `audit_logs` + ledger machinery in 0003 | Approval; ledger table exists |
+| **ADR-22** | Refresh rotation with a 10 s idempotent grace window | **Approved 2026-11-16** (Q2 resolved) | 10 s grace; 8 h sliding idle; 30 d absolute lifetime; family schema in §3.3.1 | `refresh_tokens` in 0003 | Schema implemented; concurrent-refresh and replay tests |
+| **ADR-23** | Authentication audit pathway: app-pool writer, ordered after credential verification, with a fail-closed gate | **Approved 2026-11-16** (Q8 resolved) | No audit grants to `unisync_auth`; 503 `audit_unavailable` on audit failure; **no atomicity claim** across pools; failed-login audit failure also 503 | `audit_logs` + `audit_chain_checkpoints` in 0003 | Ledger tables exist; audit gate implemented |
 | **ADR-24** | Dedicated `unisync_auth` role with its own pool for institution resolution and credential verification | **Approved with conditions** | (1) `NOSUPERUSER NOBYPASSRLS`; (2) no fallback to app or owner, ever; (3) startup guards assert the role on each pool; (4) §4.3.1 limitation documented and tested | bootstrap role + migration 0003 | Role provisioned, guards implemented, Group B characterisation tests present |
-| **ADR-25** | Institution codes stored only as keyed HMAC-SHA-256 digests | **Proposed** | Pepper outside PostgreSQL; unkeyed hashes rejected; `pepper_version` recorded per digest | migration 0003 | Approval |
+| **ADR-25** | Institution codes stored only as keyed HMAC-SHA-256 digests | **Approved 2026-11-16** | Pepper outside PostgreSQL and versioned; unkeyed hashes rejected; `pepper_version` per digest; 20-char Crockford Base32; 24 h overlap; permanent retirement | migration 0003 | Digest table + pepper config implemented |
 | **ADR-26** | One auth-only RLS policy on `users`, `TO unisync_auth`, scoped by `app.auth_institution_id` | **Approved with conditions** | Condition: it is documented and tested as **accident protection only**, never as a boundary; Group B tests must exist | migration 0003 | Policy created with 0003; characterisation tests |
 | **ADR-27** | Rename `institutions.code` → `slug`; slug is public and non-secret | **Approved** | (1) Slug is never accepted as a credential; (2) existing plaintext values become slugs, new secret codes are issued; (3) fixtures updated | migration 0003 | Signed-off migration; fixtures migrated |
-| **ADR-28** | Move `password_hash`, `failed_login_count`, `locked_until` out of `users` into `auth_user_credentials` | **Proposed** (revised: exact grants in §3.1.5) | Auth role gets **no** `UPDATE (password_hash)`; app role gets nothing | migration 0003 | Approval; §3.1.5 grants implemented as written |
-| **ADR-29** | Separate write-only `unisync_credential_writer` role for password changes | **Proposed** | No `SELECT` on hashes; authorised by a signed change grant; fallback documented | bootstrap role + migration 0003 | Approval; if rejected, ADR-28 fallback applies |
+| **ADR-28** | Move `password_hash`, `failed_login_count`, `locked_until` out of `users` into `auth_user_credentials` | **Approved 2026-11-16** | Auth role gets **no** `UPDATE (password_hash)`; app role gets nothing; exact grants in §3.1.5 | migration 0003 | Table created; `users` columns dropped; grants as written |
+| **ADR-29** | Separate write-only `unisync_credential_writer` role for password changes | **Approved 2026-11-16** | No `SELECT` on hashes; authorised by a short-lived signed change grant; `credential_version` optimistic concurrency; role provisioned in 2.0a | bootstrap role + migration 0003 | Role created; grants as written; change-grant flow implemented |
 
-**Unchanged by this audit:** ADR-19, ADR-20, ADR-22 remain Proposed. Nothing was promoted without an
-explicit reviewer approval.
+**Status after the 2026-11-16 reconciliation:** ADR-19, ADR-22, ADR-23, ADR-25, ADR-28 and ADR-29
+are **Approved** per the review baseline, joining ADR-21, ADR-24, ADR-26 and ADR-27. **ADR-20 remains
+Proposed** because department administrators are deferred (Q6). ADR-18 remains **Rejected**, preserved
+with its supersession by ADR-24.
 
 **Q8 — audit scope.** If ADR-23 is rejected, auth events have nowhere to go and Phase 2 ships
 without an audit trail, which contradicts FR-B2. Decision needed before step 2.0.
@@ -1287,24 +1354,26 @@ without an audit trail, which contradicts FR-B2. Decision needed before step 2.0
 | # | Question | Default if unanswered |
 |---|---|---|
 | Q1 | ~~Is the institution code a public identifier?~~ | **Resolved 2026-11-16: codes are secret.** A1 rejected; ADR-24 (dedicated role) + ADR-25 (keyed digests) adopted |
-| Q2 | Refresh grace window duration | 10 s |
-| Q3 | Idle timeout | 8 h sliding |
-| Q4 | No email infrastructure for reset tokens | Console notifier, dev-only log, labelled in UI |
+| Q2 | ~~Refresh grace window duration~~ | **Resolved 2026-11-16: 10 s approved** |
+| Q3 | ~~Idle timeout~~ | **Resolved 2026-11-16: 8 h sliding**, plus **30 d non-sliding absolute** lifetime; reauthentication required after expiry. Schema in §3.3.1 |
+| Q4 | ~~No email infrastructure for reset tokens~~ | **Resolved:** console/file notifier is **development-only**; the service must refuse it in production. See §3.7 |
 | Q5 | ~~`users` lookup at auth time~~ | **Resolved:** auth-only RLS policy for `unisync_auth` (ADR-26); per-request lookup uses the signature-verified claim (ADR-21) |
-| Q6 | Department administrator modelling | P5 (`department_admins` table) |
-| Q7 | Counselling/support staff | Out of scope, documented |
-| Q8 | Audit ledger pulled forward (ADR-23)? | Assume yes; Phase 2 is incomplete without it |
-| Q9 | MFA / TOTP | Out of scope for M1a; `last_step_up_at` reserved for Phase 3 |
-| Q10 | Password-reset token delivery in production | Requires an email provider decision before any real deployment |
+| Q6 | ~~Department administrator modelling~~ | **Resolved 2026-11-16: deferred.** ADR-20 stays Proposed; no `department_admins` table in MVP |
+| Q7 | ~~Counselling/support staff~~ | **Resolved 2026-11-16: in MVP.** Dedicated scope, assignment-based access, separated records, field redaction, sensitive-access audit. **Detailed architecture pending Phase 1.5B** (see §5.2) |
+| Q8 | ~~Audit ledger pulled forward (ADR-23)?~~ | **Resolved: yes.** ADR-23 approved; `audit_logs` and `audit_chain_checkpoints` are in the 0003 scope |
+| Q9 | MFA / TOTP | **Deferred to Phase 3**, extensibility retained (`last_step_up_at` reserved) |
+| Q10 | Password-reset delivery in production | **Provider undecided.** A provider-independent `Notifier` interface is required (§3.7) |
 | Q11 | ~~Rename `institutions.code` → `slug` and drop the plaintext secret?~~ | **Resolved 2026-11-16: accepted** (ADR-27; see §3.1.4). Not implemented |
 | Q12 | ~~Dual-validity window when rotating an institution code~~ | **Resolved:** 24 h overlap, with the full lifecycle in §3.1.2 |
 | Q13 | ~~Pepper rotation cadence~~ | **Resolved:** annual review, versioned peppers, full lifecycle in §3.1.3. Existing digests **cannot** be re-keyed — affected codes must be reissued |
 | **Q14** | ~~How does tenant context get established per request?~~ | **Resolved 2026-11-16: O1 adopted** (ADR-21). The verified claim is a *provisional selector*; the `users` row is *authoritative membership*; a failed cross-check aborts before any service. See §4.3 Case 2 and §16.2 |
+| **Q15** | **Open.** How does `/auth/refresh` establish tenant context before it can read `refresh_tokens`? The endpoint carries no JWT, so the tenant GUC is unset | **Unresolved.** Three options documented in §3.3.1: (a) a token-hash-scoped policy, (b) auth-pool lookup with new grants, (c) move session records out of the tenant-scoped model |
 
 **Unresolved risks**
 
-1. **T5/T16 residual:** refresh reuse detection is best-effort (grace window), and audit integrity
-   depends on ADR-23 being accepted. Both are documented rather than closed.
+1. **T5/T16 residual:** refresh reuse detection is best-effort (the 10 s grace window), and the audit
+   ledger has a single writer, so `unisync_app` can fabricate events. Both are documented rather than
+   closed; ADR-23 is approved, which removes the earlier "if it is accepted" caveat.
 2. **Application invariants I1–I4, I8–I10** are service-level. A future importer or migration that
    bypasses the service can violate them; nightly detection (Phase 6) is the compensating control.
 3. **`record_access_log` (FR-B2: "every read logged")** is not implemented and is not in this phase.
@@ -1316,10 +1385,13 @@ without an audit trail, which contradicts FR-B2. Decision needed before step 2.0
    bootstrap (the owner has `NOCREATEROLE`, so migration 0003 cannot create it), and its password
    must never be reused for `unisync_app` or `unisync_owner`. Startup guards catch misconfiguration,
    but a human still has to provision it correctly once.
-7. **The auth role can read password hashes for one institution per transaction.** That is inherent
-   to password authentication — the verifier must see the hash. Column grants and the
-   `app.auth_institution_id` policy bound it to one tenant and to the auth columns; it cannot be
-   bounded further without a password-verification oracle in the database, which would be worse.
+7. **The auth role can read password hashes.** That is inherent to password authentication — the
+   verifier must see the hash. **The `app.auth_institution_id` policy does *not* bound this against a
+   compromised role:** a custom GUC is settable by any session, so a process holding SQL as
+   `unisync_auth` can point the policy at another institution and read its credential rows (§4.3.1).
+   The real bound is what the role is **granted**: credential columns only, no academic data, no
+   `full_name`, no audit writes. Removing the grant entirely is not possible — a verifier that cannot
+   read a hash cannot verify a password.
 8. **Code secrecy depends on out-of-band distribution.** The digest protects against a database
    dump, not against a member sharing the code. If a code leaks, the detection mechanism is
    anomaly-based at best; rotation is the remedy, and it is manual.
@@ -1335,7 +1407,7 @@ without an audit trail, which contradicts FR-B2. Decision needed before step 2.0
 | `institutions` | owner (BYPASSRLS) | **no grant** | `SELECT/INSERT/UPDATE/DELETE` via RLS — own tenant only |
 | `institution_code_digests` | owner | `SELECT (institution_id, digest, pepper_version, normalization_version, is_current, expires_at)` | **no grant** |
 | `auth_user_credentials` (ADR-28) | owner | `SELECT (user_id, institution_id, password_hash, failed_login_count, locked_until, credential_version)` + `UPDATE (failed_login_count, locked_until)` — **no `UPDATE (password_hash)`** | **no grant** |
-| `users` — identity columns | owner | `SELECT (id, institution_id, email, is_active, perm_version)` + `UPDATE (failed_login_count, locked_until, last_login_at)` | `SELECT` all columns (RLS-scoped); **no `password_hash`** once ADR-28 lands |
+| `users` — identity columns | owner | `SELECT (id, institution_id, email, is_active, perm_version)` + `UPDATE (last_login_at)` — **lockout counters live in `auth_user_credentials`** after ADR-28 | `SELECT` all columns (RLS-scoped); **no `password_hash`** after ADR-28 |
 | `users` — RLS policy | bypasses | `auth_credential_lookup`, `TO unisync_auth`, `institution_id = app.current_auth_institution()` | `tenant_isolation` only |
 | 11 academic tables | owner | **no grant** | DML per default privileges, RLS-scoped |
 | `refresh_tokens`, `password_reset_tokens` | owner | **no grant** | DML |
@@ -1387,7 +1459,7 @@ and **nothing else** — no `SELECT`, no other table. If ADR-29 is rejected, tha
 | 2 | Authentication events must be tamper-evident | **Consistent** | They are ordinary rows in the appended ledger (seq, hash chain, checkpoints) |
 | 3 | Login fails closed if mandatory success auditing fails | **Was under-specified → fixed** | No failure rule existed. §3.8 now defines: audit row and refresh token commit together; no cookie is ever set otherwise; audit failure → 503 |
 | 4 | Auth role has no academic-data privileges | **Consistent** | No grants on the 11 academic tables; asserted by tests in §11.6 Group A |
-| 5 | App role cannot read password hashes | **CONTRADICTED by the current schema** | `users.password_hash` exists today and `unisync_app` has `SELECT` on every column of `users` within its tenant. True **only after ADR-28**. Until then the design must not claim it |
+| 5 | App role cannot read password hashes | **Agreed, not yet true** | ADR-28 is approved but not implemented: `users.password_hash` still exists and `unisync_app` holds table-level `SELECT` on `users`. True only after migration 0003. Until then the design must not claim it |
 | 6 | Auth GUC is not a boundary against compromised auth credentials | **Consistent** | §4.3.1; ADR-26 annotated; Group B characterisation tests |
 | 7 | Institution code digests are never exposed to the app role | **Consistent** | No grants on `institution_code_digests`; role-targeted policy |
 | 8 | The verified database user determines tenant identity | **Consistent** for the authoritative value | After cross-check, `row.institution_id` is what the request continues with |
@@ -1429,12 +1501,12 @@ forged and the lookup is RLS-scoped, that extra step closes no practical gap.
 
 ### 16.3 Statement 5 — current-state contradiction
 
-`unisync_app` can read password hashes **today**. ADR-28 fixes it. Two consequences:
+`unisync_app` can read password hashes **today**. ADR-28 is **approved** but not yet implemented.
+Two consequences:
 
-- Until ADR-28 is approved and implemented, the design must say "the app role can read hashes" rather
-  than implying isolation.
-- ADR-28 is therefore not merely hardening: it closes an existing exposure. It should be treated as
-  higher priority than its "Proposed" status implies.
+- Until migration 0003 lands, the design must say "the app role can read hashes" rather than implying
+  isolation.
+- ADR-28 is therefore not merely hardening: it closes an existing exposure, and it is gate **G1**.
 
 ### 16.4 Other inconsistencies found and corrected
 

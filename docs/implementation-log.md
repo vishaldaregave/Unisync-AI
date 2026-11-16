@@ -764,3 +764,25 @@ claim cannot be forged and the lookup is RLS-scoped.
 
 No code, migration, schema, role, RLS, Docker or environment change; nothing committed.
 
+### Revision 5 — documentation reconciliation (2026-11-16)
+
+Documentation only. `docs/phase-1.5-design.md` reconciled against the approved decision baseline.
+
+| Gap | Correction |
+|---|---|
+| **G1** | §14 risk 7 no longer claims `app.auth_institution_id` bounds a compromised role. It now states the GUC is settable, that the policy is accident protection only, and that the real bound is what `unisync_auth` is *granted* |
+| **G2** | `password_hash`, `failed_login_count` and `locked_until` removed from every `users` reference: login sequence (§3.2 diagram + steps 3c/3g) now joins `auth_user_credentials`; §15.1 grants `users.last_login_at` only |
+| **G3** | 0003 scope now lists `audit_logs`, `audit_chain_checkpoints` and `auth_user_credentials`, and drops the three migrated `users` columns |
+| **G4** | New §3.3.1 defines `refresh_tokens` in full — `family_id`, `family_created_at`, `token_hash`, `replaced_by`, `last_seen_at`, `revoked_at` — with family semantics, compare-and-set rotation, 10 s successor recovery, replay detection, 8 h idle and 30 d absolute lifetimes, plus cleanup |
+| **G5** | 2.0a now provisions `unisync_credential_writer` alongside `unisync_auth` |
+| **G6** | Stale "(P4)" replaced with "ADR-21 / O1" |
+| **G7** | ADR-19, 22, 23, 25, 28, 29 moved to **Approved**; §13 renamed from "ADR proposals (not approved)" to "ADR register" |
+| **G8** | Q6 recorded as deferred (ADR-20 stays Proposed); Q7 recorded as in MVP with the detailed counselling architecture explicitly deferred to **Phase 1.5B**. No counsellor permissions, schema or matrix column was invented |
+| **G9** | 30-day non-sliding absolute lifetime recorded in §3.5, ADR-22 and Q3 |
+| **G10** | Provider-independent `Notifier` interface recorded in §3.7; production provider still undecided; console notifier is development-only and must fail startup in production |
+
+New open question: **Q15** — how `/auth/refresh` establishes tenant context before reading
+`refresh_tokens`, since the endpoint carries no JWT. Three options documented; not decided.
+
+No code, migration, schema, role, RLS, Docker or environment change; nothing committed.
+
