@@ -282,6 +282,11 @@ owner: DROP TABLE public.__bootstrap_check;             -> DROP TABLE
 - No seed data and therefore no two-institution isolation test yet — that is the next increment and
   cannot be faked before the tables exist.
 
+**Checkpoint commit:** `5808f20a1133c1620698d405535cfde7727aed4a` —
+`feat(infra): provision PostgreSQL and Redis with owner/app roles`.
+This hash covers the Phase 1.1 work only; the line recording it is a separate
+follow-up commit so that the recorded hash stays valid.
+
 **Next increment:** the tenant-first migration — `institutions` + `institution_id` on every
 tenant-scoped table, `SET LOCAL app.institution_id` plumbing, `CREATE POLICY` per table, then a
 two-institution isolation test executed under the **runtime role**.
