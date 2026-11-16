@@ -589,5 +589,178 @@ mypy app                  Success: no issues found in 7 source files
 4. **The `enrollments` four-column FK** means `subject_id`/`term_id` are stored rather than
    generated — an approved deviation from the literal wording of §13.5-E1.2.
 
-**Status: implemented and verified, NOT committed.**
+**Status: implemented, verified and committed as `b09e30cdcfa07893ef1fbd01af73259cd55db454`.**
+
+---
+
+## Phase 1.5 — Auth, authorization and service layer (DESIGN ONLY)
+
+**Date:** 2026-11-16
+Design document: [`phase-1.5-design.md`](./phase-1.5-design.md)
+
+No application code, schema change, migration 0003, RLS change, Docker change or commit was made.
+One design document was written and this log entry added.
+
+### Reconnaissance (inspected, not assumed)
+
+| Check | Result |
+|---|---|
+| Local HEAD vs `origin/main` | `b09e30c` on both |
+| Live Alembic revision | `0002_academic_core` |
+| `apps/api/app` contents | `main.py`, `core/config.py`, `db/base.py`, `db/session.py` only — **no auth, services, policies or routers** |
+| `users` columns | 13 columns including `perm_version`, `failed_login_count`, `locked_until`; **no `last_step_up_at`** |
+| Auth tables | `refresh_tokens`, `password_reset_tokens`, `audit_logs`, `record_access_log` **do not exist** |
+| Working tree | `.commandcode/taste/` modified/untracked — the taste learning system, left untouched |
+
+### Key design decisions proposed
+
+1. **Tenant identity never comes from the request.** The institution code is a login-time selector;
+   the value that reaches `app.institution_id` is read from the `users` row. JWT `inst` is a lookup
+   hint whose failure mode is an empty result, never another tenant's data.
+2. **Four independent authorization layers** — authentication, role, resource relationship, field
+   redaction — with the 404-for-out-of-scope rule to prevent enumeration.
+3. **Request-scoped unit of work** owns the transaction and sets the tenant GUC; services never
+   commit.
+4. **`AgentContext` is strictly less powerful than a user session**: frozen, tool allow-list, one
+   pinned student, and `SYSTEM_SWEEP` unreachable from HTTP.
+5. **Capacity is serialised** with `SELECT … FOR UPDATE` on the offering row; the race is described
+   explicitly rather than hand-waved.
+
+### Items requiring approval before implementation
+
+| # | Item | Why it needs sign-off |
+|---|---|---|
+| P1 / ADR-18 | Additive login policy on `institutions` | Extends D4; the only non-forbidden way to resolve a tenant at login |
+| P4 / ADR-21 | JWT `inst` as a lookup hint | Must be recorded as a hint, never authority |
+| P5 / ADR-20 | `department_admins` table instead of a new role | Schema addition, migration 0003 |
+| P3 / ADR-22 | 10-second idempotent refresh grace | Refines E2.1 |
+| ADR-23 / Q8 | Pull the audit ledger forward from Phase 5 | Changes phase order; without it Phase 2 ships with no audit trail |
+
+### Open questions
+
+Q1 institution-code secrecy · Q2 grace duration · Q3 idle timeout · Q4 no email infrastructure ·
+Q5 user-lookup mechanism · Q6 department-admin modelling · Q7 counselling staff (out of scope) ·
+Q8 audit ledger timing · Q9 MFA · Q10 production reset delivery.
+
+### Status
+
+**Design complete, awaiting approval. Nothing implemented, nothing committed.**
+
+### Revision — A2 adopted (2026-11-16)
+
+Institution codes were confirmed **secret**, so A1 (an additive `SELECT` policy on `institutions`
+keyed on a request-supplied code) is **rejected**. `docs/phase-1.5-design.md` was revised in place.
+
+| Change | Detail |
+|---|---|
+| ADR-18 | **Rejected**, superseded by ADR-24 |
+| ADR-24 | **Selected:** dedicated `unisync_auth` role (`NOBYPASSRLS`) + separate connection pool |
+| ADR-25 | Institution codes stored **only** as keyed HMAC-SHA-256 digests; pepper outside PostgreSQL; unkeyed hashes rejected |
+| ADR-26 | One auth-only RLS policy on `users`, granted `TO unisync_auth`, scoped by `app.auth_institution_id` |
+| ADR-27 | Proposed: rename `institutions.code` → `slug` (non-secret) so no plaintext credential remains (Q11) |
+| ADR-21 | Revised: the JWT claim is **signature-verified before use** and cross-checked against the row |
+
+Also corrected in this revision: the §4.1 request diagram previously showed the actor row being read
+**before** the tenant GUC was set, which would have returned zero rows under RLS. The ordering is now
+GUC → read → cross-check.
+
+Open questions added: Q11 (slug rename), Q12 (code dual-validity window, 24 h), Q13 (pepper rotation
+cadence). Q1 and Q5 are now resolved.
+
+The 10-point mandatory security review is answered in the design (§15), including the role/privilege
+matrix for all three roles.
+
+No code, schema, migration, RLS, Docker or commit change was made by this revision.
+
+### Revision 2 — final security pass (2026-11-16)
+
+Documentation only. `docs/phase-1.5-design.md` revised again.
+
+| Change | Detail |
+|---|---|
+| **GUC reclassified** | `app.auth_institution_id` is documented as **accident protection, not a trust boundary**. Custom GUCs are settable by any session, so a compromised auth role can change it. New §4.3.1 covers four adversaries separately (bug, compromised process, leaked credentials, malicious operator) and states the residual risk plainly. |
+| **ADR-28 proposed** | Move `password_hash`, `failed_login_count`, `locked_until` out of `users` into `auth_user_credentials`, granted only to `unisync_auth`. **This fixes a real exposure found during the review: `unisync_app` can today read every column of `users` within its tenant, including password hashes.** Needs approval. |
+| **Q11 accepted** | `institutions.code` → `slug` (public, non-secret); the login code exists only as a digest. §3.1.4 documents why they are separate, who may read the slug, why the slug is rejected as a credential, and the exact rename migration. |
+| **Q12 resolved** | Full institution-code lifecycle: generation (20 chars Crockford base32, ≈100 bits), entropy floor, normalization, one-time issuance, 24 h rotation overlap, retirement, emergency revocation, no reactivation ever, audit events, step-up authorization. |
+| **Q13 resolved** | Versioned pepper map, `pepper_version` per digest, multi-version lookup, and the honest consequence: **existing digests cannot be re-keyed because the plaintext is never stored** — retiring a pepper requires reissuing every affected code. |
+| **Tests split** | §11.6 now separates **Group A** (controls the design provides, ≈18 tests) from **Group B** (characterisation tests that pin what it does *not* protect, e.g. setting the auth GUC succeeds). |
+| **Diagrams** | Added the auth-boundary flow showing the GUC limitation; existing pool and login diagrams annotated. |
+
+Nothing was implemented. No migration, schema, role, RLS, Docker or environment change; nothing
+committed.
+
+### Revision 3 — consistency audit (2026-11-16)
+
+Documentation only. Audited ADR-23, ADR-25, ADR-26 and ADR-28 against the actual repository and
+migrations, then corrected `docs/phase-1.5-design.md`.
+
+**ADR-23 resolved (was a genuine three-way conflict).** Auth cannot write the ledger, auth events
+must be tamper-evident, and login must fail if the mandatory event is not persisted. Selected the
+**app-pool writer** (Option A): auth pool verifies and commits; a single app-pool transaction inserts
+the audit row and, on success, the refresh token; cookies are minted only after that commit. Audit
+failure returns **503 `audit_unavailable`** for both successful and failed login attempts. The design
+now states explicitly that the two transactions are **not** atomic with each other, and what is
+guaranteed instead. Dedicated audit-writer role and outbox were evaluated and rejected/deferred.
+
+**ADR-28 narrowed.** The auth role now gets `SELECT` on credential columns and `UPDATE` **only** on
+`failed_login_count` and `locked_until` — **not** `password_hash`. Password writes move to a proposed
+**ADR-29** write-only role (`UPDATE (password_hash, password_changed_at, credential_version)`, no
+`SELECT`), authorised by a signed 5-minute change grant with `credential_version` optimistic
+concurrency. A compromised auth process can therefore read hashes and reset lockout, but cannot
+replace a password. The fallback (granting `UPDATE (password_hash)` to auth) is documented with its
+consequence.
+
+**Status reconciliation.** Single vocabulary applied (Approved / Approved with conditions / Proposed /
+Rejected / Superseded). ADR-18 Rejected (supersession history preserved); ADR-24 and ADR-26
+Approved with conditions; ADR-27 Approved; ADR-19/20/21/22/23/25/28/29 still Proposed. ADR-21 was
+flagged "do not reopen" but never explicitly approved, so it stays Proposed — recorded rather than
+inferred.
+
+**Two contradictions found** (design §16):
+
+1. **Statement 5** — "the app role cannot read password hashes" is false against the current schema:
+   `users.password_hash` exists and `unisync_app` has `SELECT` on all of `users` within its tenant.
+   True only after ADR-28. This elevates ADR-28 from hardening to closing an existing exposure.
+2. **Statement 9** — "JWT claims never establish tenant context" is not literally true: the app-pool
+   GUC is set from `token.inst` before the row is read. Three options documented; **Q14 raised** and
+   left unresolved because O2 changes the auth pool's role from login-only to per-request.
+
+No code, migration, schema, role, RLS, Docker or environment change; nothing committed.
+
+### Revision 4 — Q14 resolved (2026-11-16)
+
+Documentation only. O1 adopted; the tenant-context invariant is restated as **provenance vs
+authority**.
+
+**Resolution.** A verified `inst` claim may *select* a provisional tenant scope for one identity
+lookup. It never *establishes* authoritative context: the `users` row is authoritative for membership
+and the request aborts in-transaction if they disagree. ADR-21 is now **Approved**; Q14 is closed.
+
+**Coherence checked against the real SQL, not the prose.** Under the current `users` policy the
+lookup is already scoped by the same GUC, so `row.institution_id == token.inst` is **tautological
+today**. The load-bearing controls are signature verification (nothing else can put a wrong `inst` in
+a token) and RLS scoping (a wrong claim yields zero rows). The explicit comparison is retained as a
+**regression guard** against a future policy change, and §4.3 now says so instead of implying it does
+work it does not do. Revocation comes from `is_active` and `perm_version` in the same row read, not
+from the signature.
+
+**O2 was not adopted.** Per-request auth-pool validation would avoid passing a tenant value through a
+claim, but it makes the auth pool a dependency of every request and closes no practical gap, since the
+claim cannot be forged and the lookup is RLS-scoped.
+
+**New §17 pre-production security gates** (G1–G10), notably:
+
+- **G1 — ADR-28 is required remediation, not optional.** Until `password_hash` leaves `users`,
+  `unisync_app` can read hashes for its tenant. Verified by catalogue inspection against migration
+  0001; this predates A2 and must be fixed before authentication goes live.
+- **G2 — the ADR-23 audit gate** must be implemented, or a login can succeed with no tamper-evident
+  record.
+- **G3 — audit forgery is an accepted residual**: `unisync_app` can insert arbitrary events; the
+  database cannot distinguish auth events from academic ones.
+- **G10 — `record_access_log` remains unimplemented**; the product must not claim read auditing.
+
+**Status discipline preserved.** Nothing was promoted. ADR-19, 20, 22, 23, 25, 28 and 29 remain
+**Proposed**; only ADR-21 changed status, because O1 was an explicit decision.
+
+No code, migration, schema, role, RLS, Docker or environment change; nothing committed.
 
