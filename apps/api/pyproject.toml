@@ -75,6 +75,7 @@ plugins = ["pydantic.mypy"]
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
 markers = [
     "db: requires a live PostgreSQL instance (Phase 1 onward)",
 ]

@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     migration_database_url: str = (
         "postgresql+psycopg://unisync_owner:local-owner-placeholder@localhost:5432/unisync"
     )
+    # Role names, used to enforce separation at startup (v2 §13.5-E1.1).
+    postgres_owner_user: str = "unisync_owner"
+    postgres_app_user: str = "unisync_app"
 
     # --- Redis ----------------------------------------------------------
     redis_url: str = "redis://localhost:6379/0"

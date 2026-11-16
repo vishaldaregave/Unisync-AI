@@ -291,3 +291,124 @@ follow-up commit so that the recorded hash stays valid.
 tenant-scoped table, `SET LOCAL app.institution_id` plumbing, `CREATE POLICY` per table, then a
 two-institution isolation test executed under the **runtime role**.
 
+---
+
+### 1.2 Tenant-first database foundation (complete, verified)
+
+**Date:** 2026-11-16
+Design: [`phase-1.2-design.md`](./phase-1.2-design.md)
+
+#### Review corrections applied
+
+| # | Finding | Resolution |
+|---|---|---|
+| R1 | Inventory arithmetic inconsistent; `assignments`/`submissions` missing | Recomputed from §4.1, §4.2, §13.5-E1.3: **48 tables = 47 tenant-scoped + `institutions`**. Exclusions named explicitly (`policy_rules` is a YAML file; `escalations` collapsed into `followup_tasks`). |
+| R2 | `citext` not provisioned; availability unverified | Added to bootstrap; verified `citext 1.6` and `vector 0.8.7` installed **before** the migration ran. Migration now aborts if either is absent. |
+| R3 | GUC threat model undocumented | Documented in design §6 and in `app/db/session.py`: a session can set its own custom GUC, so RLS is a backstop for query bugs, never a boundary against a confused application. |
+| R4 | Runtime role privileges under-specified | Owns nothing, no `TRUNCATE`, no DDL on policies, cannot disable RLS — each asserted. |
+| R5 | T8 must execute a query after `SET row_security = off` | Implemented; asserts the specific `row-level security` error. |
+| R6 | T7 must cover commit **and** rollback | Split into T7a/T7b/T7c on a pool-size-one engine. |
+| R7 | D8: avoid database-level `CREATE` | `app` schema created by the bootstrap superuser, owned by `unisync_owner`. No `CREATE ON DATABASE` grant. |
+| R8 | D5: institution code in the login identifier | Recorded; no `SECURITY DEFINER` bypass will be created. Phase 2 concern. |
+
+#### Migration
+
+| Field | Value |
+|---|---|
+| Revision | `0001_tenancy` (head) |
+| File | `apps/api/migrations/versions/0001_tenancy_foundation.py` |
+| SHA-256 | `747d056e184aae321cf02f59889ddcfae65eff20b19c425abab03430f43c3d8d` |
+| Tables | `institutions`, `departments`, `users`, `faculty`, `students`, `advisor_assignments` |
+| Extensions used | `citext` (tenant-scoped keys), `vector` (provisioned now, unused until RAG) |
+
+#### Commands executed and results
+
+| # | Command | Result |
+|---|---|---|
+| 1 | `docker compose down -v && docker compose up -d db redis` | volumes recreated so the amended bootstrap ran; both healthy |
+| 2 | `SELECT name, installed_version FROM pg_available_extensions` | `citext 1.6`, `vector 0.8.7` |
+| 3 | `SELECT nspname, owner FROM pg_namespace WHERE nspname='app'` | `app` → `unisync_owner` |
+| 4 | `alembic upgrade head` | applied `0001_tenancy`, exit 0 |
+| 5 | `alembic downgrade base` | clean rollback, 1 table left (`alembic_version`) |
+| 6 | `alembic upgrade head` | re-applied, exit 0 |
+| 7 | `ruff check .` | All checks passed |
+| 8 | `ruff format --check .` | 18 files already formatted |
+| 9 | `mypy app` | Success: no issues found in 7 source files |
+| 10 | `pytest -q` | **25 passed**, 1 warning |
+
+#### Catalogue verification (queried, not assumed)
+
+- **8 foreign keys**, 6 of them composite tenant FKs
+  (`(user_id, institution_id)`, `(department_id, institution_id)`,
+  `(advisor_id, institution_id)`, `(student_id, institution_id)`), all `ON DELETE RESTRICT`.
+- **Unique constraints**: `uq_institutions_code`, `uq_departments_institution_code`,
+  `uq_users_institution_email`, `uq_faculty_institution_employee_code`,
+  `uq_students_institution_roll_number`, plus `uq_*_id_institution` on every parent so composite
+  FKs have a valid target, plus the two partial uniques
+  `uq_advisor_assignments_active_pair` and `uq_advisor_assignments_primary`.
+- **Indexes**: advisor_assignments 6, departments 4, faculty 7, institutions 2, students 7, users 4.
+- **Ownership**: every table owned by `unisync_owner`; `relrowsecurity = t` and
+  `relforcerowsecurity = t` on all six; six `tenant_isolation` policies with both `USING` and
+  `WITH CHECK`.
+- **Privileges for `unisync_app`**: `SELECT/INSERT/UPDATE/DELETE = t`, `TRUNCATE = f` on every
+  table. `alembic_version` revoked entirely from the runtime role (Alembic creates it, so the
+  bootstrap default privileges had granted it DML).
+
+#### Test matrix — all executed as `unisync_app`
+
+| # | Test | Node | Result |
+|---|---|---|---|
+| T1 | Read isolation across three tables | `test_t1_cannot_read_other_institution` | pass |
+| T2 | Update isolation (`UPDATE 0`) | `test_t2_cannot_update_other_institution` | pass |
+| T3 | Delete isolation (`DELETE 0`) | `test_t3_cannot_delete_other_institution` | pass |
+| T4 | Cross-tenant insert rejected (`42501`) | `test_t4_cannot_insert_row_for_other_institution` | pass |
+| T5 | Missing GUC: 0 rows, writes rejected | `test_t5_missing_context_returns_no_rows_and_rejects_writes` | pass |
+| T6 | Malformed GUC: 0 rows, writes rejected | `test_t6_invalid_context_does_not_grant_access` | pass |
+| T7a | COMMIT clears context (pool size 1) | `test_t7a_commit_clears_context` | pass |
+| T7b | ROLLBACK clears context | `test_t7b_rollback_clears_context` | pass |
+| T7c | A→B→A switching does not leak | `test_t7c_switching_context_between_transactions_does_not_leak` | pass |
+| T8 | `row_security=off` then query errors | `test_t8_runtime_role_cannot_bypass_rls` | pass |
+| T8 | Cannot disable RLS / drop / create policy | `test_t8_runtime_role_cannot_alter_rls_objects` | pass |
+| T9 | Composite FK rejects cross-tenant reference | `test_t9_composite_fk_rejects_cross_tenant_reference` | pass |
+| T10 | Runtime role owns no table | `test_t10_runtime_role_owns_no_tables` | pass |
+| T10 | Runtime role cannot read `alembic_version` | `test_t10_runtime_role_cannot_touch_alembic_version` | pass |
+| T11 | No `TRUNCATE` privilege, direct truncate denied | `test_t11_runtime_role_cannot_truncate` | pass |
+| T12 | Conflicting records coexist across tenants | `test_t12_conflicting_records_coexist_across_institutions` | pass |
+| — | Owner credentials rejected at startup | `test_owner_credentials_are_rejected_at_startup` | pass |
+| — | Runtime credentials pass the guard | `test_runtime_credentials_pass_the_startup_guard` | pass |
+| — | URL guard rejects/accepts correctly | `test_url_guard_rejects_owner_url`, `test_url_guard_accepts_runtime_url` | pass |
+| — | App refuses a session without a tenant | `test_missing_tenant_is_refused_by_the_application` | pass |
+
+Total: **21 database tests + 4 pre-existing = 25 passed**.
+
+#### Finding recorded during implementation
+
+`SET LOCAL` on a **custom** GUC does not restore `NULL` when the transaction ends — PostgreSQL
+restores the empty string `''` once the GUC has been defined in that session. The first run of
+T7a/T7b asserted `IS NULL` and failed with `''`.
+
+This is not a leak: `app.current_institution()` maps `''` to `NULL`, so the effective tenant is
+`NULL` and zero rows are visible — which is why that branch exists in the function. The tests were
+corrected to assert the *effective* tenant (`app.current_institution() IS NULL`) plus
+`raw IN (NULL, '')` plus zero visible rows. Recorded here because the original design note said
+"assert the setting is NULL", and that was wrong about PostgreSQL's behaviour.
+
+#### Known limitations
+
+1. **RLS is not a trust boundary.** `app.institution_id` is a custom GUC any session can set; the
+   protection is against query bugs, not a compromised application. Tenant identity must come from
+   authenticated identity in Phase 2.
+2. **Login cannot read `users` yet.** With RLS on and no context, authentication has no path until
+   Phase 2 adds the institution code to the login identifier (D5/R8).
+3. **`students.current_term_id` does not exist yet** — deferred to migration 0002.
+4. **Test data lives in the dev database** and is truncated per test; there is no separate test
+   database (that would need `CREATEDB`, which neither role has by design).
+5. **Migration 0001 has no data migrations** and no seed generator; seeding exists only as test
+   fixtures.
+
+#### Phase 1.2 acceptance
+
+All eight required isolation test groups pass, executed against PostgreSQL under `unisync_app`.
+**Phase 1.2 is complete.** Migration 0002 (academic core) is the next increment and has not been
+started.
+
