@@ -217,4 +217,72 @@ No migrations were added. No database objects exist yet.
 | Formatting, linting, type-check and test commands | Met | commands 5–13; `pnpm run verify` exit 0 |
 | `docs/implementation-log.md` maintained | Met | this file |
 
-**Phase 0 is complete.** Phase 1 is **not started** — it is blocked on B1 (no database).
+**Phase 0 is complete.**
+
+---
+
+## Phase 1 — Tenant-first database
+
+### 1.1 Infrastructure (complete, verified)
+
+**Date:** 2026-11-16
+**Scope of this increment:** PostgreSQL + Redis running, roles provisioned, pgvector available,
+connectivity proven from the host for both roles. **No schema and no migration yet.**
+
+Environment was re-verified before any change: Docker 29.9.3, Docker Compose v5.7.0, daemon up
+(Linux containers, 16 vCPU, 8 GB). B1 from Phase 0 is resolved.
+
+| Component | Result |
+|---|---|
+| `docker compose up -d db redis` | Network `unisync_default`, volumes `unisync_pgdata` + `unisync_redisdata` created; both containers started |
+| PostgreSQL image | `pgvector/pgvector:pg16` → PostgreSQL **16.16** (Debian) |
+| Health | `unisync-db` healthy, `unisync-redis` healthy |
+| Redis | `PING` → `PONG` |
+| pgvector | `vector` **0.8.7** installed at init time |
+| `public` schema owner | `unisync_owner` |
+| `unisync_owner` | `rolsuper=f`, **`rolbypassrls=t`**, login=t, createdb=f, createrole=f |
+| `unisync_app` | `rolsuper=f`, **`rolbypassrls=f`**, login=t, createdb=f, createrole=f |
+| Host TCP, asyncpg as app role | `current_user=unisync_app`, `is_superuser=off`, **`row_security=on`** |
+| Host TCP, psycopg as owner role | `current_user=unisync_owner`, `bypassrls=True` |
+| Alembic wiring | `alembic current` → connects via `PostgresqlImpl`, transactional DDL, **no revisions yet** |
+
+Least-privilege behaviour was tested, not assumed:
+
+```
+owner: CREATE TABLE public.__bootstrap_check(id int);   -> CREATE TABLE
+app:   SELECT count(*) FROM public.__bootstrap_check;   -> 0 rows  (default privileges work)
+app:   CREATE TABLE public.__should_fail(id int);       -> ERROR: permission denied for schema public
+owner: DROP TABLE public.__bootstrap_check;             -> DROP TABLE
+```
+
+**Files created / modified**
+
+| File | Change |
+|---|---|
+| `docker/postgres/init/01-bootstrap.sh` | new — provisions `unisync_owner` (BYPASSRLS, not superuser) and `unisync_app` (NOBYPASSRLS), installs pgvector, transfers `public` schema ownership to the owner, sets `ALTER DEFAULT PRIVILEGES` so future owner-created tables are usable by the runtime role |
+| `docker-compose.yml` | db service now passes the four role variables and mounts the init directory read-only; the stale "UNVERIFIED" header note was corrected |
+| `README.md` | Phase 1 status and infrastructure section corrected |
+| `.env` | created from `.env.example` (git-ignored — never committed) |
+
+**Design notes**
+
+- The owner role is **BYPASSRLS but not superuser**. `CREATE EXTENSION vector` therefore runs in
+  the bootstrap script as the container superuser, once, instead of requiring a superuser migration.
+  This keeps the migration role as unprivileged as the design allows.
+- `ALTER DEFAULT PRIVILEGES ... FOR ROLE unisync_owner` is set at bootstrap rather than per
+  migration. Per-migration `GRANT`s are the kind of thing one migration forgets.
+- The runtime role gets `USAGE` but **not `CREATE`** on `public` — proven above by the permission
+  denied error.
+- Passwords live in `.env`, which is git-ignored. They are local placeholders and are documented as
+  such in `.env.example`.
+
+**Not done in this increment**
+
+- No tables, no migration, no RLS policy, no GUC. `alembic current` correctly reports nothing.
+- No seed data and therefore no two-institution isolation test yet — that is the next increment and
+  cannot be faked before the tables exist.
+
+**Next increment:** the tenant-first migration — `institutions` + `institution_id` on every
+tenant-scoped table, `SET LOCAL app.institution_id` plumbing, `CREATE POLICY` per table, then a
+two-institution isolation test executed under the **runtime role**.
+

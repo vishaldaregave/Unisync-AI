@@ -11,7 +11,7 @@ Architecture source of truth: `docs/architecture-v2.md` (the v2 document, includ
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Repository and engineering foundation | implemented |
-| 1 | Tenant-first database (GUC + RLS) | not started |
+| 1 | Tenant-first database (GUC + RLS) | infrastructure up; schema/migration not started |
 | 2 | Authentication and authorization | not started |
 | 3 | Policy and execution boundary | not started |
 | 4 | Deterministic risk queue and approval flow | not started |
@@ -63,9 +63,15 @@ uvicorn app.main:app --reload --port 8000
 
 ## Infrastructure
 
-`docker-compose.yml` provisions PostgreSQL 16 with pgvector and Redis. It is authored but
-has **not been executed on this machine** — Docker is not installed. Nothing in Phase 1
-can be validated until a database is available.
+`docker-compose.yml` provisions PostgreSQL 16 with pgvector and Redis, plus a one-shot
+bootstrap script (`docker/postgres/init/01-bootstrap.sh`) that creates the two roles the
+architecture requires — `unisync_owner` (migrations, BYPASSRLS) and `unisync_app` (runtime,
+RLS-subject). Verified working; see `docs/implementation-log.md` Phase 1.1.
+
+```bash
+cp .env.example .env
+docker compose up -d db redis
+```
 
 ## Repository layout
 
