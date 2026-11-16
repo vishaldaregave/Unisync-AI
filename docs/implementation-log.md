@@ -412,3 +412,42 @@ All eight required isolation test groups pass, executed against PostgreSQL under
 **Phase 1.2 is complete.** Migration 0002 (academic core) is the next increment and has not been
 started.
 
+---
+
+## Phase 1.3 — Academic core (DESIGN APPROVED, documentation checkpoint)
+
+**Date:** 2026-11-16
+Design document: [`phase-1.3-design.md`](./phase-1.3-design.md)
+
+No migration, schema change or application code was produced. One design document was written.
+
+Checkpoint verification at the start of this phase:
+
+| Check | Result |
+|---|---|
+| Local head vs `origin/main` | `e17e404` on both — matches |
+| Phase 1.2 and documentation commits on origin | `e17e404`, `336c391` — present |
+| Alembic head | `0001_tenancy (head)`, single head |
+| Migration SHA-256 | `747d056e…c791bc78` — matches the recorded value |
+| Working tree | **not strictly clean**: `.commandcode/taste/` modified/untracked (taste learning system, not application work) |
+| `alembic current` | not run — Docker daemon down at the time; head verified statically via `alembic heads` |
+
+The design covers 11 tables (`terms`, `subjects`, `subject_prerequisites`, `subject_offerings`,
+`enrollments`, `class_sessions`, `attendance_records`, `assessments`, `marks`, `assignments`,
+`submissions`) plus `students.current_term_id`, deferred from 0001.
+
+Four items were **approved on 2026-11-16** because they revise architecture-v2:
+
+1. **E1.2's "generated column" is not implementable** — PostgreSQL generated columns cannot read
+   another table. **Approved:** stored `subject_id`, pinned by the four-column composite FK
+   `(offering_id, subject_id, term_id, institution_id)`.
+2. **`submission_status`** — **approved** as `(missing, submitted, graded)`; lateness is `is_late`.
+3. **Attempt/version model** — **approved:** one submission per assignment for MVP, with attempts
+   recorded as a future extension.
+4. **`terms.registration_closes_at`** — **approved**, completing the registration window.
+
+The remaining recommendations (P4, P5, P6, P8, Q1, Q3, Q4) were accepted as written. The design is
+**approved for a documentation checkpoint**; implementation has not started.
+
+Not started: migration 0002, seed data, ORM models, API, tests.
+
