@@ -38,7 +38,30 @@ async def test_t10_runtime_role_owns_no_tables(
             """
         )
 
-    assert len(rows) == 6, f"expected 6 tenant tables, found {[r['table_name'] for r in rows]}"
+    assert rows, "no tables found"
+    expected = {
+        # Phase 1.2
+        "institutions",
+        "departments",
+        "users",
+        "faculty",
+        "students",
+        "advisor_assignments",
+        # Phase 1.4 / migration 0002
+        "terms",
+        "subjects",
+        "subject_prerequisites",
+        "subject_offerings",
+        "enrollments",
+        "class_sessions",
+        "attendance_records",
+        "assessments",
+        "assignments",
+        "marks",
+        "submissions",
+    }
+    found = {row["table_name"] for row in rows}
+    assert found == expected, f"unexpected table set: {found ^ expected}"
     assert all(row["owner"] == settings.postgres_owner_user for row in rows)
 
 

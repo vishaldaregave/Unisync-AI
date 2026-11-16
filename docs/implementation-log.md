@@ -451,3 +451,143 @@ The remaining recommendations (P4, P5, P6, P8, Q1, Q3, Q4) were accepted as writ
 
 Not started: migration 0002, seed data, ORM models, API, tests.
 
+---
+
+## Phase 1.4 — Migration 0002 applied (implemented, not committed)
+
+**Date:** 2026-11-16
+Design: [`phase-1.3-design.md`](./phase-1.3-design.md) · Design checkpoint `1981314`
+
+### Preflight (all conditions passed)
+
+| Check | Result |
+|---|---|
+| HEAD vs `origin/main` | `1981314` on both |
+| Live `alembic current` | `0001_tenancy` |
+| Migration heads | `0001_tenancy` only |
+| Migration 0001 SHA-256 | `747d056e…c791bc78` — matched |
+| Staged changes | none |
+| `.commandcode/taste/` | untouched, unstaged |
+
+### Migration
+
+| Field | Value |
+|---|---|
+| Revision | `0002_academic_core` (head) |
+| Parent | `0001_tenancy` |
+| File | `apps/api/migrations/versions/0002_academic_core.py` |
+| SHA-256 | `67831ad7d3b51b3f39443c3a897fb436905d21d8de978429a55b353972c82d98` |
+| 0001 SHA-256 after | `747d056e…c791bc78` — **unchanged** |
+
+### Created
+
+- **11 tables**: `terms`, `subjects`, `subject_prerequisites`, `subject_offerings`,
+  `enrollments`, `class_sessions`, `attendance_records`, `assessments`, `assignments`, `marks`,
+  `submissions`; plus `students.current_term_id` (composite FK to `terms`).
+- **6 enums**: `prerequisite_kind`, `delivery_modality`, `enrollment_status`,
+  `attendance_status`, `assessment_type`, `submission_status` (`missing,submitted,graded`).
+- **31 new foreign keys** (39 total in the schema). Every one is composite and includes
+  `institution_id`, so cross-tenant references fail even with RLS bypassed.
+- **1 partial unique index**: `uq_terms_one_current` on `(institution_id) WHERE is_current`.
+- **11 RLS policies** (17 total), each `ENABLE` + `FORCE` with `USING` and `WITH CHECK`.
+- **3 business triggers** + **10 `updated_at` triggers**:
+  - `trg_marks_within_max` — score ≤ assessment `max_score`
+  - `trg_submissions_within_max` — score ≤ assignment `max_score`
+  - `trg_assessments_weight_total` — `DEFERRABLE INITIALLY DEFERRED`, published weights ≤ 100
+- **62 indexes** across the 11 new tables (query paths + FK-leading columns)
+- **25 check constraints** schema-wide
+
+### Integrity mechanisms
+
+- **Tenant pinning** — composite FKs including `institution_id`.
+- **Offering pinning** — `attendance_records`, `marks`, `submissions` carry a shared
+  `offering_id` pinned by two composite FKs, so the session/enrolment and
+  assessment/enrolment pairs must belong to the same offering. Proven by A7/A8, including
+  control cases where matching offerings are accepted.
+- **Enrolment pinning** — the four-column FK keeps `subject_id`/`term_id` equal to the
+  offering's values.
+
+### Deviations recorded
+
+| # | Deviation | Reason |
+|---|---|---|
+| D1 | **11 FK-leading indexes added** beyond the design's §4.3 index list | §4.3 listed query paths, not FK paths. Test A22 requires an index whose leading column is each FK's first column; the gap was found by writing that test, before applying. |
+| D2 | Design §8.3 said "24 foreign keys"; the actual count is **31 new (39 total)** | My arithmetic in the design was wrong. The catalogue is authoritative; recorded here. |
+| D3 | `CHECK` added on `min_grade` and `final_grade` for the 0–100 range | Direct consequence of the approved Q1 grade scale; the design listed the column type but not the bound. |
+| D4 | Phase 1.2 test `test_t10_runtime_role_owns_no_tables` hard-coded 6 tables and failed after 0002 | Updated to assert the exact 17-table set instead of a magic number. The failure was a stale assertion, not a regression. |
+| D5 | A20 (downgrade/re-upgrade) executed through the Alembic CLI, not pytest | It manipulates schema state rather than application data. |
+
+### Tests — 25 in `test_academic_core.py`, all passing
+
+| # | Test | Result |
+|---|---|---|
+| A1 | cross-tenant prerequisite rejected (owner, RLS bypassed) | pass |
+| A2 | offering cannot use another tenant's term | pass |
+| A3 | enrolment cannot reference another tenant's offering | pass |
+| A4 | tenant-scoped uniqueness (same code in two tenants, duplicate within one) | pass |
+| A5 | duplicate enrolment, same offering | pass |
+| A6 | double enrolment across sections of one subject | pass |
+| A7 | attendance cannot mix offerings (both offerings tried) | pass |
+| A7b | attendance with matching offerings accepted (control) | pass |
+| A8 | marks cannot mix offerings (both offerings tried) | pass |
+| A8b | marks with matching offering accepted (control) | pass |
+| A9 | mark above `max_score` rejected | pass |
+| A10 | published weights 60 + 50 rejected at COMMIT | pass |
+| A10b | weights 60 + 40 accepted, total verified = 100.00 | pass |
+| A11 | `max_score` 0 and −10 rejected | pass |
+| A12 | `weight_percent` −1 and 101 rejected | pass |
+| A13 | duplicate submission rejected | pass |
+| A14 | submission score above assignment max rejected | pass |
+| A15 | RLS read isolation across 7 tables | pass |
+| A16 | RLS write isolation: `UPDATE 0`, `DELETE 0`, cross-tenant insert `42501` | pass |
+| A17 | missing tenant GUC → 0 rows on all 8 sampled tables | pass |
+| A18 | malformed tenant GUC → 0 rows | pass |
+| A19 | runtime role: owns nothing, no TRUNCATE, no RLS DDL | pass |
+| A21 | every FK has a unique target | pass |
+| A22 | every FK has a leading-column index | pass |
+| A22b | all 17 tenant tables RLS-enabled + forced; all 17 policies carry both predicates | pass |
+
+Full suite: **50 passed** (4 API unit + 21 Phase 1.2 + 25 academic core).
+
+### Quality gates
+
+```
+ruff check .              All checks passed
+ruff format --check .     20 files already formatted
+mypy app                  Success: no issues found in 7 source files
+```
+
+### Upgrade / downgrade / re-upgrade
+
+| Step | Result |
+|---|---|
+| `alembic upgrade head` (first apply) | `0001_tenancy → 0002_academic_core`, exit 0 |
+| `alembic downgrade 0001_tenancy` | clean; 7 relations left (6 Phase 1.2 tables + `alembic_version`) |
+| 0001 objects after downgrade | `advisor_assignments`, `departments`, `faculty`, `institutions`, `students`, `users` — all intact |
+| `alembic upgrade head` (re-apply) | exit 0, `0002_academic_core (head)` |
+
+### Catalogue verification
+
+| Check | Result |
+|---|---|
+| Tables | 17 tenant tables, **1 distinct owner**, RLS on 17/17, FORCE on 17/17 |
+| Policies | 17, all with `current_institution` in both `qual` and `with_check` |
+| Foreign keys | 39 total, **39 tenant-pinned** |
+| Triggers | 13: 3 business + 10 `updated_at`; `trg_assessments_weight_total` is deferrable + init-deferred |
+| Grants | `TRUNCATE` granted to `unisync_app` on **0** tables; `SELECT` on 17 |
+| Enums | exact approved value sets |
+
+### Limitations
+
+1. **Downgrade is destructive** — it drops academic data. It exists to prove reversibility in a
+   disposable environment, not as a production rollback strategy.
+2. **Application-level invariants remain** (design §6): prerequisite cycles, session-within-term,
+   `meets_on` local-date consistency, attendance only for active enrolments, capacity ceilings,
+   frozen lateness, closed-term write rules. They are not enforced by the database and the
+   application layer does not exist yet.
+3. **No seed data, no ORM models, no API.** The tables are empty between test runs.
+4. **The `enrollments` four-column FK** means `subject_id`/`term_id` are stored rather than
+   generated — an approved deviation from the literal wording of §13.5-E1.2.
+
+**Status: implemented and verified, NOT committed.**
+
