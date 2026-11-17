@@ -36,7 +36,7 @@ export function Tabs({
               className={cn(
                 "-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition-colors",
                 selected
-                  ? "border-indigo-600 text-slate-900"
+                  ? "border-brand-600 text-slate-900"
                   : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700",
               )}
             >

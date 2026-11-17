@@ -144,7 +144,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
             <span className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-slate-200" aria-hidden="true" />
             {studentInterventions.map((item) => (
               <li key={item.id} className="relative pl-5">
-                <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-indigo-500" />
+                <span className="absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-brand-600" />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[13px] font-medium capitalize text-slate-900">
                     {item.type}

@@ -104,7 +104,7 @@ export default function ApprovalsPage() {
             value={editedDraft}
             onChange={(event) => setEditedDraft(event.target.value)}
             rows={7}
-            className="w-full rounded-lg border border-indigo-300 bg-white p-3 text-[13px] leading-relaxed text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-lg border border-brand-300 bg-white p-3 text-[13px] leading-relaxed text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-100"
           />
         ) : (
           <blockquote className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-[13px] leading-relaxed text-slate-700">
@@ -316,7 +316,7 @@ export default function ApprovalsPage() {
                     className={cn(
                       "w-full rounded-lg border px-3 py-2.5 text-left transition-colors",
                       active
-                        ? "border-indigo-200 bg-indigo-50/60"
+                        ? "border-brand-200 bg-brand-50/60"
                         : "border-slate-200 bg-white hover:border-slate-300",
                     )}
                   >

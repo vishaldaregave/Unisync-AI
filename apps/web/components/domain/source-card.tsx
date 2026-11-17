@@ -87,8 +87,8 @@ export function FabricDiagram({ sources }: { sources: DataSource[] }) {
         </span>
       </div>
 
-      <div className="rounded-xl2 border border-indigo-200 bg-indigo-50/60 p-4">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-indigo-600">
+      <div className="rounded-xl2 border border-brand-200 bg-brand-50/60 p-4">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-brand-600">
           One student record
         </p>
         <p className="mt-1 text-sm font-semibold text-slate-900">Aarav Menon · 2023CS041</p>
@@ -98,7 +98,7 @@ export function FabricDiagram({ sources }: { sources: DataSource[] }) {
         </p>
         <Link
           href="/students/aarav-menon"
-          className="mt-3 inline-block text-[12px] font-medium text-indigo-700 hover:underline"
+          className="mt-3 inline-block text-[12px] font-medium text-brand-700 hover:underline"
         >
           Open the composed record →
         </Link>

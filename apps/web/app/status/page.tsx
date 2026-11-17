@@ -12,7 +12,7 @@ const milestones = [
 
 const stateStyle: Record<string, { label: string; className: string }> = {
   implemented: { label: "implemented", className: "bg-emerald-50 text-emerald-700" },
-  design: { label: "design only", className: "bg-indigo-50 text-indigo-700" },
+  design: { label: "design only", className: "bg-brand-50 text-brand-700" },
   planned: { label: "planned", className: "bg-slate-100 text-slate-500" },
 };
 

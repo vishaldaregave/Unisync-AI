@@ -67,7 +67,7 @@ export function MiniGraph() {
       <p className="text-[11px] leading-snug text-slate-500">
         One change — a failed prerequisite, a missed lab — reaches every node connected to it. The
         graph is a view over the academic tables, not a second copy.{" "}
-        <Link href="/graph" className="font-medium text-indigo-700 hover:underline">
+        <Link href="/graph" className="font-medium text-brand-700 hover:underline">
           Open the full map
         </Link>
       </p>

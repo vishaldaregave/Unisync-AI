@@ -132,7 +132,7 @@ export default function GraphPage() {
               </p>
               <Link
                 href="/students/aarav-menon"
-                className="mt-3 inline-block text-[12px] font-medium text-indigo-700 hover:underline"
+                className="mt-3 inline-block text-[12px] font-medium text-brand-700 hover:underline"
               >
                 Open the student behind this graph →
               </Link>

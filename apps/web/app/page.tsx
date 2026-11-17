@@ -1,17 +1,24 @@
 import Link from "next/link";
-import { ArrowUpRight, ChevronRight } from "lucide-react";
+import {
+  ArrowUpRight,
+  CalendarClock,
+  ChevronRight,
+  CircleCheck,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
 
-import { MetricStrip } from "@/components/dashboard/metric-strip";
-import { Pipeline } from "@/components/dashboard/pipeline";
-import { RiskMix, WeekBars } from "@/components/dashboard/risk-mix";
+import { AnalyticsBars, BarLabels } from "@/components/dashboard/analytics-bars";
+import { Gauge } from "@/components/dashboard/gauge";
+import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PageHeader } from "@/components/layout/app-shell";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import {
   NOW,
-  bandCounts,
   interventionMix,
   population,
-  recentActivity,
   summary,
   weeklyFlagged,
   type PopulationStudent,
@@ -20,269 +27,274 @@ import { cn } from "@/lib/utils";
 
 const QUEUE_IDS = ["neha-kulkarni", "aarav-menon", "kabir-shah", "ishan-rao", "diya-sharma"];
 
-const BAND_LABEL = { low: "Low", medium: "Medium", high: "High", critical: "Critical" } as const;
-
-const BAND_PILL: Record<PopulationStudent["band"], string> = {
-  low: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  medium: "border-amber-200 bg-amber-50 text-amber-700",
-  high: "border-rose-200 bg-rose-50 text-rose-700",
-  critical: "border-rose-300 bg-rose-100 text-rose-800",
-};
-
-const BAND_BAR: Record<PopulationStudent["band"], string> = {
+const BAND_DOT: Record<PopulationStudent["band"], string> = {
   low: "bg-emerald-500",
   medium: "bg-amber-400",
-  high: "bg-rose-500",
+  high: "bg-rose-400",
   critical: "bg-rose-600",
 };
 
-const INTERVENTION_LABEL = {
-  outreach: "Outreach",
-  tutoring: "Tutoring",
-  meeting: "Advisor meeting",
-  referral: "Referral",
-} as const;
+const BAND_TINT: Record<PopulationStudent["band"], string> = {
+  low: "bg-brand-50",
+  medium: "bg-amber-50",
+  high: "bg-amber-50",
+  critical: "bg-rose-50",
+};
 
-function slaLabel(student: PopulationStudent) {
+const ADVISORS = [
+  { name: "Dr. R. Okafor", working: "CS301 attendance follow-up", status: "Reviewing", tone: "amber" as const, hue: 152 },
+  { name: "Dr. P. Nair", working: "EE lab attendance check-in", status: "On track", tone: "brand" as const, hue: 96 },
+  { name: "Dr. M. Fernandes", working: "ME310 resubmission", status: "On track", tone: "brand" as const, hue: 28 },
+  { name: "Dr. S. Iyer", working: "CS310 lab supervision", status: "Awaiting", tone: "rose" as const, hue: 205 },
+];
+
+function dueLabel(student: PopulationStudent) {
   const hours = Math.round((student.slaDueAt.getTime() - NOW.getTime()) / 3_600_000);
-  if (hours < 0) return { text: `${Math.abs(hours)}h overdue`, overdue: true };
-  if (hours <= 24) return { text: `due in ${hours}h`, overdue: false };
-  return { text: `due in ${Math.round(hours / 24)}d`, overdue: false };
+  if (hours < 0) return { text: `${Math.abs(hours)}h overdue`, urgent: true };
+  if (hours <= 24) return { text: `Due in ${hours}h`, urgent: false };
+  return { text: `Due in ${Math.round(hours / 24)}d`, urgent: false };
 }
 
-function agoLabel(minutes: number) {
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round(minutes / 60);
-  return hours < 24 ? `${hours}h` : `${Math.round(hours / 24)}d`;
-}
-
-export default function CommandDashboard() {
+export default function DashboardPage() {
   const queue = QUEUE_IDS.map((id) => population.find((s) => s.id === id)).filter(
     (s): s is PopulationStudent => Boolean(s),
   );
 
-  const interventionTotal = interventionMix.reduce((sum, item) => sum + item.count, 0);
-  const maxIntervention = Math.max(...interventionMix.map((item) => item.count), 1);
+  const weeks = weeklyFlagged.slice(-8);
+  const inFlight = interventionMix.reduce((sum, item) => sum + item.count, 0);
 
   return (
     <>
       <PageHeader
         eyebrow="Command"
-        title="This week"
-        description="Five students have a decision waiting. Everything below is ranked by score and by how soon the window closes."
+        title="Dashboard"
+        description="Plan, prioritise and act on the students who need you this week."
         actions={
           <>
-            <span className="hidden items-center gap-1.5 text-[11.5px] text-slate-400 sm:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-              sweep 07:12 · {summary.students.toLocaleString()} scanned
-            </span>
-            <Link href="/approvals" className={cn(buttonVariants({ variant: "primary", size: "sm" }))}>
-              Open governance centre
-              <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+            <Link href="/fabric" className={cn(buttonVariants({ variant: "outline", size: "md" }))}>
+              Data sources
+            </Link>
+            <Link href="/approvals" className={cn(buttonVariants({ variant: "primary", size: "md" }))}>
+              <span className="text-[15px] leading-none">+</span>
+              Review approvals
             </Link>
           </>
         }
       />
 
-      <MetricStrip
-        metrics={[
-          {
-            label: "Students monitored",
-            value: summary.students.toLocaleString(),
-            note: `${summary.newThisWeek} new enrolments this week`,
-            delta: { value: "0.9%", direction: "up", good: true },
-          },
-          {
-            label: "At risk",
-            value: String(summary.atRisk),
-            note: `${summary.critical} critical · ${summary.overdue} overdue`,
-            delta: { value: "4", direction: "down", good: true },
-          },
-          {
-            label: "Decisions taken",
-            value: "129",
-            note: "every drafted action was decided",
-          },
-          {
-            label: "Decided on time",
-            value: `${summary.slaPct}%`,
-            note: "9 decisions breached their window",
-            delta: { value: "2.2%", direction: "up", good: true },
-          },
-        ]}
-      />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          dark
+          label="Students monitored"
+          value={summary.students.toLocaleString()}
+          note="Increased from last month"
+          icon={Users}
+        />
+        <KpiCard
+          label="At risk"
+          value={String(summary.atRisk)}
+          note={`${summary.critical} critical · 4 fewer than last week`}
+          icon={TriangleAlert}
+        />
+        <KpiCard
+          label="Interventions in flight"
+          value={String(inFlight)}
+          note="12 closed this week"
+          icon={CircleCheck}
+        />
+        <KpiCard
+          label="Awaiting approval"
+          value="5"
+          note="2 due before 18:00"
+          icon={CalendarClock}
+        />
+      </div>
 
-      <div className="mt-7 grid gap-x-8 gap-y-8 lg:grid-cols-[minmax(0,1fr)_286px]">
-        <section>
-          <div className="mb-1 flex items-baseline justify-between gap-3">
-            <div className="flex items-baseline gap-2.5">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Priority queue
-              </h2>
-              <span className="tnum text-[11px] text-slate-400">{queue.length} waiting</span>
-            </div>
-            <span className="text-[11px] text-slate-400">sorted by score</span>
-          </div>
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <Card className="flex flex-col">
+          <CardHeader
+            title="Alert activity"
+            description="Students flagged per week"
+            action={<Badge tone="brand">8 weeks</Badge>}
+          />
+          <CardBody className="flex flex-1 flex-col justify-end">
+            <AnalyticsBars data={weeks.map((w) => ({ label: w.week, value: w.flagged }))} />
+            <BarLabels labels={weeks.map((w) => w.week)} />
+          </CardBody>
+        </Card>
 
-          <ul className="mt-2 border-t border-slate-200">
-            {queue.map((student) => {
-              const sla = slaLabel(student);
-              return (
-                <li key={student.id}>
-                  <Link
-                    href={`/students/${student.id}`}
-                    className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-slate-100 py-3 transition-colors hover:bg-slate-50/70"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
-                        style={{ backgroundColor: `hsl(${(student.score * 7) % 360} 32% 38%)` }}
-                        aria-hidden="true"
-                      >
-                        {student.name
-                          .split(" ")
-                          .map((p) => p.charAt(0))
-                          .slice(0, 2)
-                          .join("")}
-                      </span>
+        <Card className="flex flex-col">
+          <CardHeader title="Next decision" action={<Badge tone="rose">Overdue</Badge>} />
+          <CardBody className="flex flex-1 flex-col">
+            <p className="text-[17px] font-semibold leading-snug tracking-tight text-ink">
+              Neha Kulkarni
+            </p>
+            <p className="mt-1 text-[12.5px] leading-snug text-ink-muted">
+              Three missed labs and an unpaid balance.
+            </p>
+            <p className="tnum mt-4 text-[12.5px] text-ink-muted">
+              Window closed <span className="font-semibold text-ink">33h ago</span>
+            </p>
 
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-[13px] font-medium text-slate-900 group-hover:underline group-hover:decoration-slate-300 group-hover:underline-offset-2">
-                            {student.name}
-                          </span>
-                          <span className="tnum hidden shrink-0 text-[11px] text-slate-400 sm:inline">
-                            {student.roll}
-                          </span>
-                          <span
-                            className={cn(
-                              "shrink-0 rounded border px-1.5 py-px text-[9.5px] font-semibold uppercase tracking-wider",
-                              BAND_PILL[student.band],
-                            )}
-                          >
-                            {BAND_LABEL[student.band]}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 truncate text-[12px] text-slate-500">
-                          {student.driver}
-                          <span className="text-slate-300"> · </span>
-                          <span className="text-slate-400">{student.advisor}</span>
-                        </p>
-                      </div>
-                    </div>
+            <dl className="mt-4 space-y-2 border-t border-line pt-3">
+              {[
+                ["Risk score", "89 · critical"],
+                ["Attendance", "41% · 3 missed labs"],
+                ["Last contact", "11 days ago"],
+              ].map(([term, value]) => (
+                <div key={term} className="flex items-baseline justify-between gap-3 text-[12px]">
+                  <dt className="text-ink-soft">{term}</dt>
+                  <dd className="tnum font-medium text-ink">{value}</dd>
+                </div>
+              ))}
+            </dl>
 
-                    <div className="flex shrink-0 items-center gap-4">
+            <Link
+              href="/approvals"
+              className={cn(buttonVariants({ variant: "primary", size: "md" }), "mt-5 w-full")}
+            >
+              <CalendarClock className="h-4 w-4" aria-hidden="true" />
+              Review now
+            </Link>
+          </CardBody>
+        </Card>
+
+        <Card className="flex flex-col">
+          <CardHeader
+            title="Priority queue"
+            action={
+              <Link href="/approvals" className="text-[12px] font-medium text-brand-700 hover:underline">
+                View all
+              </Link>
+            }
+          />
+          <CardBody className="flex-1">
+            <ul className="space-y-0.5">
+              {queue.map((student) => {
+                const due = dueLabel(student);
+                return (
+                  <li key={student.id}>
+                    <Link
+                      href={`/students/${student.id}`}
+                      className="group -mx-2 flex items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-surface-soft"
+                    >
                       <span
                         className={cn(
-                          "tnum hidden text-[11px] sm:inline",
-                          sla.overdue ? "font-medium text-rose-600" : "text-slate-400",
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                          BAND_TINT[student.band],
                         )}
+                        aria-hidden="true"
                       >
-                        {sla.text}
+                        <span className={cn("h-2 w-2 rounded-full", BAND_DOT[student.band])} />
                       </span>
-
-                      <div className="hidden w-20 items-center gap-2 md:flex">
-                        <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            className={cn("h-full rounded-full", BAND_BAR[student.band])}
-                            style={{ width: `${student.score}%` }}
-                          />
-                        </div>
-                        <span className="tnum w-5 text-right text-[12px] font-medium text-slate-900">
-                          {student.score}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[12.5px] font-medium text-ink">
+                          {student.name}
                         </span>
-                      </div>
-
+                        <span
+                          className={cn(
+                            "tnum block text-[11px]",
+                            due.urgent ? "font-medium text-rose-600" : "text-ink-soft",
+                          )}
+                        >
+                          {due.text}
+                        </span>
+                      </span>
                       <ChevronRight
-                        className="h-4 w-4 text-slate-300 transition-colors group-hover:text-slate-600"
+                        className="h-4 w-4 shrink-0 text-line-strong transition-colors group-hover:text-ink-muted"
                         aria-hidden="true"
                       />
-                    </div>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardBody>
+        </Card>
+      </div>
 
-          <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2">
-            <Link
-              href="/students/aarav-menon"
-              className="inline-flex items-center gap-1 text-[12px] font-medium text-slate-700 hover:text-slate-900"
-            >
-              All {summary.atRisk} at-risk students
-              <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-            <span className="text-[11px] text-slate-400">recomputed 07:12 · engine v1.2</span>
-          </div>
-
-          <section className="mt-8 border-t border-slate-200 pt-6">
-            <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Interventions in flight
-              </h2>
-              <span className="tnum text-[11px] text-slate-400">{interventionTotal} open</span>
-            </div>
-
-            <ul className="space-y-3">
-              {interventionMix.map((item) => (
-                <li key={item.type} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 text-[12px] text-slate-600">
-                    {INTERVENTION_LABEL[item.type]}
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <Card className="flex flex-col">
+          <CardHeader
+            title="Advisors"
+            action={
+              <span className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-ink-muted">
+                + Add member
+              </span>
+            }
+          />
+          <CardBody className="flex-1">
+            <ul className="space-y-2.5">
+              {ADVISORS.map((advisor) => (
+                <li key={advisor.name} className="flex items-center gap-3">
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                    style={{ backgroundColor: `hsl(${advisor.hue} 34% 42%)` }}
+                    aria-hidden="true"
+                  >
+                    {advisor.name
+                      .replace("Dr. ", "")
+                      .split(" ")
+                      .map((p) => p.charAt(0))
+                      .slice(0, 2)
+                      .join("")}
                   </span>
-                  <div className="h-[3px] flex-1 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-slate-900"
-                      style={{ width: `${(item.count / maxIntervention) * 100}%` }}
-                    />
-                  </div>
-                  <span className="tnum w-6 text-right text-[12px] font-medium text-slate-900">
-                    {item.count}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12.5px] font-medium text-ink">
+                      {advisor.name}
+                    </span>
+                    <span className="block truncate text-[11px] text-ink-soft">
+                      Working on <span className="text-ink-muted">{advisor.working}</span>
+                    </span>
                   </span>
+                  <Badge tone={advisor.tone}>{advisor.status}</Badge>
                 </li>
               ))}
             </ul>
+          </CardBody>
+        </Card>
 
-            <p className="mt-3 text-[11px] leading-snug text-slate-400">
-              High and critical students only. A student can hold more than one intervention; the
-              figures are per type, not per person.
+        <Card>
+          <CardHeader title="Decision progress" description="This cycle" />
+          <CardBody className="pt-2">
+            <Gauge
+              value={summary.slaPct}
+              label="decided on time"
+              legend={[
+                { label: "On time", color: "#1F6B4B" },
+                { label: "Breached", color: "#E7ECE8" },
+              ]}
+            />
+            <p className="mt-4 text-center text-[11px] leading-snug text-ink-soft">
+              129 decisions · 9 breached their window
             </p>
-          </section>
-        </section>
+          </CardBody>
+        </Card>
 
-        <aside className="space-y-7 lg:border-l lg:border-slate-200 lg:pl-6">
-          <RiskMix data={bandCounts} total={summary.students} />
-
-          <WeekBars data={weeklyFlagged} />
-
-          <section>
-            <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Activity
-              </h2>
-              <Link href="/approvals" className="text-[11px] text-slate-400 hover:text-slate-700">
-                history
-              </Link>
+        <div className="flex flex-col justify-between rounded-card bg-gradient-to-br from-brand-700 via-brand-800 to-brand-900 p-6 text-white shadow-card">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[12.5px] font-medium text-brand-100">Nightly sweep</p>
+              <p className="tnum mt-3 text-[38px] font-bold leading-none tracking-[-0.03em]">
+                07:12
+              </p>
+              <p className="mt-2 text-[11.5px] text-brand-100/80">
+                1,284 students rescored · 4 minutes ago
+              </p>
             </div>
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
+              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+            </span>
+          </div>
 
-            <ol className="space-y-2.5">
-              {recentActivity.map((event) => (
-                <li key={event.id} className="flex gap-3 text-[12px] leading-snug">
-                  <span className="tnum w-7 shrink-0 pt-px text-right text-[10.5px] text-slate-400">
-                    {agoLabel(event.minutesAgo)}
-                  </span>
-                  <span className="text-slate-500">
-                    <span className="font-medium text-slate-800">{event.actor}</span> {event.verb}{" "}
-                    <span className="text-slate-700">{event.object}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-        </aside>
-      </div>
-
-      <div className="mt-9 border-t border-slate-200 pt-7">
-        <Pipeline />
+          <Link
+            href="/status"
+            className="mt-6 flex items-center justify-between rounded-full bg-white/12 px-4 py-2.5 text-[12px] font-medium transition-colors hover:bg-white/20"
+          >
+            Engine v1.2 · deterministic
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
       </div>
     </>
   );

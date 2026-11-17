@@ -4,23 +4,23 @@ import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-slate-900 text-white hover:bg-slate-800",
-        primary: "bg-indigo-600 text-white hover:bg-indigo-500",
-        outline: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
-        ghost: "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
-        subtle: "bg-slate-100 text-slate-700 hover:bg-slate-200",
+        default: "bg-ink text-white hover:bg-ink/90",
+        primary: "bg-brand-600 text-white hover:bg-brand-700",
+        outline: "border border-line-strong bg-white text-ink hover:bg-surface-soft",
+        ghost: "text-ink-muted hover:bg-surface-sunken hover:text-ink",
+        subtle: "bg-surface-sunken text-ink hover:bg-line",
         danger: "bg-rose-600 text-white hover:bg-rose-500",
-        success: "bg-emerald-600 text-white hover:bg-emerald-500",
+        success: "bg-brand-500 text-white hover:bg-brand-600",
       },
       size: {
-        sm: "h-8 px-3 text-[13px]",
-        md: "h-9 px-4",
-        lg: "h-10 px-5",
-        icon: "h-8 w-8",
+        sm: "h-9 px-4 text-[13px]",
+        md: "h-10 px-5 text-sm",
+        lg: "h-11 px-6 text-[15px]",
+        icon: "h-9 w-9",
       },
     },
     defaultVariants: { variant: "outline", size: "md" },

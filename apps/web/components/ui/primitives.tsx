@@ -6,7 +6,7 @@ export function Input({ className, ...props }: ComponentProps<"input">) {
   return (
     <input
       className={cn(
-        "h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100",
+        "h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100",
         className,
       )}
       {...props}
@@ -22,7 +22,7 @@ export function Progress({ value, className }: { value: number; className?: stri
   return (
     <div className={cn("h-1.5 w-full overflow-hidden rounded-full bg-slate-100", className)}>
       <div
-        className="h-full rounded-full bg-indigo-500"
+        className="h-full rounded-full bg-brand-500"
         style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>

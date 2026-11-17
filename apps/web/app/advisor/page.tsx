@@ -124,7 +124,7 @@ export default function AdvisorPage() {
                   key={suggestion}
                   type="button"
                   onClick={() => send(suggestion)}
-                  className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600 transition-colors hover:border-indigo-200 hover:text-indigo-700"
+                  className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600 transition-colors hover:border-brand-200 hover:text-brand-700"
                 >
                   {suggestion}
                 </button>

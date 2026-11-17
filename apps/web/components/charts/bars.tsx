@@ -8,7 +8,7 @@ export interface BarDatum {
 export function BarSeries({
   data,
   className,
-  color = "rgb(99 102 241)",
+  color = "#1F6B4B",
   suffix,
 }: {
   data: BarDatum[];

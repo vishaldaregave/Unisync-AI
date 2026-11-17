@@ -5,10 +5,7 @@ import { cn } from "@/lib/utils";
 export function Card({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
-      className={cn(
-        "rounded-xl2 border border-slate-200 bg-white shadow-card",
-        className,
-      )}
+      className={cn("rounded-card border border-line bg-white shadow-card", className)}
       {...props}
     />
   );
@@ -26,11 +23,11 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-start justify-between gap-4 px-5 pt-4", className)}>
+    <div className={cn("flex items-start justify-between gap-4 px-6 pt-5", className)}>
       <div className="min-w-0">
-        <h3 className="text-sm font-semibold tracking-tight text-slate-900">{title}</h3>
+        <h3 className="text-[15px] font-semibold tracking-tight text-ink">{title}</h3>
         {description ? (
-          <p className="mt-0.5 text-[13px] leading-snug text-slate-500">{description}</p>
+          <p className="mt-1 text-[12.5px] leading-snug text-ink-muted">{description}</p>
         ) : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
@@ -39,5 +36,5 @@ export function CardHeader({
 }
 
 export function CardBody({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("px-5 pb-5 pt-3", className)} {...props} />;
+  return <div className={cn("px-6 pb-6 pt-4", className)} {...props} />;
 }

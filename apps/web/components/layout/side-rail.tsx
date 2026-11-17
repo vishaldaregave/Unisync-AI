@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   Bot,
+  CircleDot,
   GitBranch,
   LayoutDashboard,
   ShieldCheck,
@@ -13,76 +14,115 @@ import {
 
 import { cn } from "@/lib/utils";
 
-const nav = [
+const menu = [
   { href: "/", label: "Command", icon: LayoutDashboard, exact: true },
   { href: "/students/aarav-menon", label: "Students", icon: Users, match: "/students" },
   { href: "/advisor", label: "Advisor", icon: Bot },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, badge: "5" },
+];
+
+const workspace = [
   { href: "/fabric", label: "Fabric", icon: Activity },
   { href: "/graph", label: "Graph", icon: GitBranch },
+  { href: "/status", label: "Build status", icon: CircleDot },
 ];
+
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  badge,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  badge?: string;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] transition-colors",
+        active
+          ? "bg-brand-50 font-semibold text-brand-800"
+          : "font-medium text-ink-muted hover:bg-surface-soft hover:text-ink",
+      )}
+    >
+      <Icon
+        className={cn(
+          "h-[18px] w-[18px] shrink-0",
+          active ? "text-brand-600" : "text-ink-soft group-hover:text-ink-muted",
+        )}
+        aria-hidden="true"
+      />
+      <span className="flex-1">{label}</span>
+      {badge ? (
+        <span className="rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+          {badge}
+        </span>
+      ) : null}
+    </Link>
+  );
+}
 
 export function SideRail() {
   const pathname = usePathname();
 
+  const isActive = (item: { href: string; exact?: boolean; match?: string }) =>
+    item.exact
+      ? pathname === item.href
+      : item.match
+        ? pathname.startsWith(item.match)
+        : pathname === item.href || pathname.startsWith(`${item.href}/`);
+
   return (
-    <aside className="hidden w-[218px] shrink-0 border-r border-slate-200 bg-white md:flex md:flex-col">
-      <div className="flex h-14 items-center gap-2 border-b border-slate-100 px-4">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-[11px] font-bold text-white">
+    <aside className="hidden w-[236px] shrink-0 flex-col border-r border-line px-4 py-5 md:flex">
+      <Link href="/" className="flex items-center gap-2.5 px-2">
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-[12px] font-bold text-white">
           US
         </span>
-        <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold tracking-tight text-slate-900">
-            UniSync AI
-          </p>
-          <p className="text-[10px] uppercase tracking-wider text-slate-400">Alpha University</p>
-        </div>
-      </div>
+        <span className="min-w-0">
+          <span className="block text-[15px] font-bold tracking-tight text-ink">UniSync AI</span>
+          <span className="block text-[10.5px] font-medium uppercase tracking-[0.12em] text-ink-soft">
+            Alpha University
+          </span>
+        </span>
+      </Link>
 
-      <nav className="flex-1 space-y-0.5 p-2">
-        {nav.map((item) => {
-          const Icon = item.icon;
-          const active = item.exact
-            ? pathname === item.href
-            : item.match
-              ? pathname.startsWith(item.match)
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors",
-                active
-                  ? "bg-slate-50 font-medium text-slate-900"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-              )}
-            >
-              <span
-                className={cn(
-                  "absolute left-0 top-1.5 bottom-1.5 w-0.5 rounded-r",
-                  active ? "bg-indigo-600" : "bg-transparent",
-                )}
-                aria-hidden="true"
-              />
-              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="flex-1">{item.label}</span>
-              {item.badge ? (
-                <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
-                  {item.badge}
-                </span>
-              ) : null}
-            </Link>
-          );
-        })}
+      <p className="mt-7 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
+        Menu
+      </p>
+      <nav className="mt-2 space-y-1">
+        {menu.map((item) => (
+          <NavLink key={item.href} {...item} active={isActive(item)} />
+        ))}
       </nav>
 
-      <div className="border-t border-slate-100 p-3">
-        <p className="rounded-lg bg-amber-50 px-2.5 py-2 text-[10px] leading-snug text-amber-800">
-          Prototype · sample data. No live database, no model calls.
-        </p>
+      <p className="mt-6 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-soft">
+        Workspace
+      </p>
+      <nav className="mt-2 space-y-1">
+        {workspace.map((item) => (
+          <NavLink key={item.href} {...item} active={isActive(item)} />
+        ))}
+      </nav>
+
+      <div className="mt-auto">
+        <div className="rounded-card bg-gradient-to-b from-brand-700 to-brand-900 p-4 text-white">
+          <p className="text-[13px] font-semibold">Governance first</p>
+          <p className="mt-1 text-[11px] leading-snug text-brand-100/85">
+            Agents propose. A named human approves. Every step is on the ledger.
+          </p>
+          <Link
+            href="/status"
+            className="mt-3 flex h-8 items-center justify-center rounded-full bg-white/12 text-[11.5px] font-medium text-white transition-colors hover:bg-white/20"
+          >
+            View build status
+          </Link>
+        </div>
       </div>
     </aside>
   );

@@ -12,7 +12,7 @@ body {
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-canvas text-ink antialiased;
   font-feature-settings: "cv11", "ss01";
 }
 
@@ -21,27 +21,31 @@ body {
 }
 
 ::selection {
-  @apply bg-indigo-100 text-indigo-900;
+  @apply bg-brand-100 text-brand-800;
 }
 
 .scroll-thin {
   scrollbar-width: thin;
-  scrollbar-color: rgb(203 213 225) transparent;
+  scrollbar-color: rgb(220 227 221) transparent;
 }
 .scroll-thin::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 .scroll-thin::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-slate-300;
+  @apply rounded-full bg-line-strong;
 }
 .scroll-thin::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.grid-lines {
-  background-image:
-    linear-gradient(to right, rgb(226 232 240 / 0.6) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(226 232 240 / 0.6) 1px, transparent 1px);
-  background-size: 28px 28px;
+/* Diagonal hatching used by the analytics bars. */
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgb(169 216 190 / 0.55) 0,
+    rgb(169 216 190 / 0.55) 2px,
+    transparent 2px,
+    transparent 6px
+  );
 }
