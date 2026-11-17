@@ -1,12 +1,5 @@
 import Link from "next/link";
-import {
-  ArrowUpRight,
-  CalendarClock,
-  ChevronRight,
-  CircleCheck,
-  TriangleAlert,
-  Users,
-} from "lucide-react";
+import { CalendarClock, ChevronRight, CircleCheck, TriangleAlert, Users } from "lucide-react";
 
 import { AnalyticsBars, BarLabels } from "@/components/dashboard/analytics-bars";
 import { Gauge } from "@/components/dashboard/gauge";
@@ -41,6 +34,13 @@ const BAND_TINT: Record<PopulationStudent["band"], string> = {
   critical: "bg-rose-50",
 };
 
+const INTERVENTION_LABEL = {
+  outreach: "Outreach",
+  tutoring: "Tutoring",
+  meeting: "Advisor meeting",
+  referral: "Referral",
+} as const;
+
 const ADVISORS = [
   { name: "Dr. R. Okafor", working: "CS301 attendance follow-up", status: "Reviewing", tone: "amber" as const, hue: 152 },
   { name: "Dr. P. Nair", working: "EE lab attendance check-in", status: "On track", tone: "brand" as const, hue: 96 },
@@ -62,6 +62,9 @@ export default function DashboardPage() {
 
   const weeks = weeklyFlagged.slice(-8);
   const inFlight = interventionMix.reduce((sum, item) => sum + item.count, 0);
+  const programmes = new Set(population.map((s) => s.programme)).size;
+  const overdueInQueue = queue.filter((s) => dueLabel(s).urgent).length;
+  const maxIntervention = Math.max(...interventionMix.map((item) => item.count), 1);
 
   return (
     <>
@@ -87,25 +90,25 @@ export default function DashboardPage() {
           dark
           label="Students monitored"
           value={summary.students.toLocaleString()}
-          note="Increased from last month"
+          note={`Across ${programmes} programmes`}
           icon={Users}
         />
         <KpiCard
           label="At risk"
           value={String(summary.atRisk)}
-          note={`${summary.critical} critical · 4 fewer than last week`}
+          note={`${summary.critical} critical · ${summary.overdue} overdue`}
           icon={TriangleAlert}
         />
         <KpiCard
           label="Interventions in flight"
           value={String(inFlight)}
-          note="12 closed this week"
+          note="Outreach, tutoring, meetings"
           icon={CircleCheck}
         />
         <KpiCard
           label="Awaiting approval"
-          value="5"
-          note="2 due before 18:00"
+          value={String(queue.length)}
+          note={`${overdueInQueue} past its window`}
           icon={CalendarClock}
         />
       </div>
@@ -215,14 +218,7 @@ export default function DashboardPage() {
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <Card className="flex flex-col">
-          <CardHeader
-            title="Advisors"
-            action={
-              <span className="rounded-full border border-line px-2.5 py-1 text-[11px] font-medium text-ink-muted">
-                + Add member
-              </span>
-            }
-          />
+          <CardHeader title="Advisors" description="Assigned to open cases" />
           <CardBody className="flex-1">
             <ul className="space-y-2.5">
               {ADVISORS.map((advisor) => (
@@ -271,30 +267,29 @@ export default function DashboardPage() {
           </CardBody>
         </Card>
 
-        <div className="flex flex-col justify-between rounded-card bg-gradient-to-br from-brand-700 via-brand-800 to-brand-900 p-6 text-white shadow-card">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-[12.5px] font-medium text-brand-100">Nightly sweep</p>
-              <p className="tnum mt-3 text-[38px] font-bold leading-none tracking-[-0.03em]">
-                07:12
-              </p>
-              <p className="mt-2 text-[11.5px] text-brand-100/80">
-                1,284 students rescored · 4 minutes ago
-              </p>
-            </div>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
-              <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-            </span>
-          </div>
-
-          <Link
-            href="/status"
-            className="mt-6 flex items-center justify-between rounded-full bg-white/12 px-4 py-2.5 text-[12px] font-medium transition-colors hover:bg-white/20"
-          >
-            Engine v1.2 · deterministic
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </div>
+        <Card className="flex flex-col">
+          <CardHeader
+            title="Interventions by type"
+            description="Open, high and critical only"
+            action={<Badge tone="neutral">{inFlight}</Badge>}
+          />
+          <CardBody className="flex-1 space-y-4">
+            {interventionMix.map((item) => (
+              <div key={item.type}>
+                <div className="flex items-baseline justify-between gap-3 text-[12.5px]">
+                  <span className="text-ink-muted">{INTERVENTION_LABEL[item.type]}</span>
+                  <span className="tnum font-semibold text-ink">{item.count}</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-sunken">
+                  <div
+                    className="h-full rounded-full bg-brand-600"
+                    style={{ width: `${(item.count / maxIntervention) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </CardBody>
+        </Card>
       </div>
     </>
   );

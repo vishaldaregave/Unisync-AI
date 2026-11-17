@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Mail, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { SideRail } from "@/components/layout/side-rail";
@@ -34,33 +34,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               <input
                 aria-label="Search students"
                 placeholder="Search students, subjects…"
-                className="h-10 w-[280px] rounded-full border border-line bg-white pl-11 pr-14 text-[13px] text-ink placeholder:text-ink-soft focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100 lg:w-[320px]"
+                className="h-10 w-[280px] rounded-full border border-line bg-white pl-11 pr-4 text-[13px] text-ink placeholder:text-ink-soft focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100 lg:w-[320px]"
               />
-              <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-line bg-surface-soft px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">
-                ⌘F
-              </kbd>
             </label>
 
             <div className="ml-auto flex items-center gap-2">
               <Badge tone="brand" className="hidden md:inline-flex">
                 Demo data
               </Badge>
-
-              <button
-                type="button"
-                aria-label="Messages"
-                className="hidden h-10 w-10 items-center justify-center rounded-full border border-line text-ink-muted transition-colors hover:bg-surface-soft sm:flex"
-              >
-                <Mail className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                aria-label="Notifications"
-                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink-muted transition-colors hover:bg-surface-soft"
-              >
-                <Bell className="h-4 w-4" />
-                <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-rose-500" />
-              </button>
 
               <div className="ml-1 flex items-center gap-2.5">
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-[12px] font-semibold text-brand-800">

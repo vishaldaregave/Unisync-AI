@@ -1,4 +1,3 @@
-import { ArrowUpRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -25,25 +24,9 @@ export function KpiCard({
           : "border-line bg-white",
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <p
-          className={cn(
-            "text-[12.5px] font-medium",
-            dark ? "text-brand-100" : "text-ink-muted",
-          )}
-        >
-          {label}
-        </p>
-        <span
-          className={cn(
-            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-            dark ? "bg-white/15 text-white" : "border border-line text-ink-muted",
-          )}
-          aria-hidden="true"
-        >
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </span>
-      </div>
+      <p className={cn("text-[12.5px] font-medium", dark ? "text-brand-100" : "text-ink-muted")}>
+        {label}
+      </p>
 
       <p
         className={cn(
