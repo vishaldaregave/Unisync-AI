@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>UniSync AI — Software Prototype Report</title>
+<style>
+  @page { size: A4; margin: 17mm 15mm 16mm 15mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size: 10.4pt; line-height: 1.55; color: #16202e;
+  }
+  p { margin: 0 0 8pt; text-align: justify; }
+  h1, h2, h3, h4 { font-family: "Segoe UI", Arial, sans-serif; color: #0f172a; margin: 0; page-break-after: avoid; }
+  p { orphans: 3; widows: 3; }
+  h1.chapter { font-size: 19pt; font-weight: 700; letter-spacing: -0.3px; margin: 0 0 4pt; page-break-before: always; }
+  h1.chapter .num { color: #4f46e5; margin-right: 8pt; }
+  h2 { font-size: 12.5pt; font-weight: 650; margin: 16pt 0 6pt; }
+  h3 { font-size: 10.8pt; font-weight: 650; margin: 11pt 0 4pt; color: #1f2937; }
+  ul, ol { margin: 0 0 9pt; padding-left: 16pt; }
+  li { margin-bottom: 3pt; text-align: justify; }
+  .rule { height: 2px; background: #0f172a; margin: 6pt 0 14pt; }
+  .accent { height: 3px; width: 54px; background: #4f46e5; margin: 5pt 0 12pt; }
+
+  /* ---- cover ---- */
+  .cover { height: 252mm; display: flex; flex-direction: column; page-break-after: always; }
+  .cover .inst { border-bottom: 2px solid #0f172a; padding-bottom: 10pt; }
+  .cover .inst .name { font-size: 15pt; font-weight: 700; letter-spacing: 0.4px; }
+  .cover .inst .sub { font-size: 9.5pt; color: #475569; margin-top: 2pt; letter-spacing: 0.3px; }
+  .cover .mid { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .cover .kicker { font-size: 9pt; letter-spacing: 2.6px; text-transform: uppercase; color: #4f46e5; font-weight: 700; }
+  .cover .title { font-size: 34pt; font-weight: 700; letter-spacing: -1.1px; margin: 8pt 0 6pt; line-height: 1.05; }
+  .cover .tagline { font-size: 12.5pt; color: #334155; max-width: 132mm; line-height: 1.45; }
+  .cover .meta { display: flex; gap: 26pt; margin-top: 20pt; font-size: 9.5pt; color: #475569; }
+  .cover .meta b { display: block; color: #0f172a; font-size: 10.5pt; }
+  .cover table { width: 100%; border-collapse: collapse; font-size: 9.3pt; margin-top: 6pt; }
+  .cover th { text-align: left; font-weight: 650; color: #0f172a; border-bottom: 1.5px solid #0f172a; padding: 5pt 4pt; }
+  .cover td { padding: 5pt 4pt; border-bottom: 0.5pt solid #cbd5e1; }
+  .cover .foot { border-top: 2px solid #0f172a; padding-top: 8pt; font-size: 9pt; color: #475569; display: flex; justify-content: space-between; }
+
+  /* ---- tables ---- */
+  table.t { width: 100%; border-collapse: collapse; font-size: 8.9pt; margin: 6pt 0 4pt; page-break-inside: avoid; }
+  table.t th { background: #0f172a; color: #fff; text-align: left; padding: 5pt 6pt; font-weight: 600; font-size: 8.6pt; }
+  table.t td { padding: 4.5pt 6pt; border-bottom: 0.5pt solid #dbe2ea; vertical-align: top; }
+  table.t tr { break-inside: avoid; page-break-inside: avoid; }
+  table.t tbody tr:has(td[colspan="6"]) { break-after: avoid; page-break-after: avoid; }
+  table.t thead { display: table-header-group; }
+  table.t tr:nth-child(even) td { background: #f8fafc; }
+  table.t .c { text-align: center; }
+  .caption { font-size: 8.4pt; color: #64748b; margin: 2pt 0 10pt; font-style: italic; }
+
+  .pill { display: inline-block; padding: 1pt 6pt; border-radius: 9pt; font-size: 7.6pt; font-weight: 650; letter-spacing: 0.2px; white-space: nowrap; }
+  .p-done { background: #dcfce7; color: #166534; }
+  .p-proto { background: #e0e7ff; color: #3730a3; }
+  .p-des { background: #fef3c7; color: #92400e; }
+  .p-plan { background: #f1f5f9; color: #475569; }
+
+  /* ---- figures ---- */
+  figure { margin: 8pt 0 12pt; page-break-inside: avoid; }
+  figure img { width: 100%; border: 0.7pt solid #cbd5e1; border-radius: 3pt; display: block; }
+  figure .figcap { font-size: 8.4pt; color: #64748b; margin-top: 4pt; font-style: italic; text-align: center; }
+  .svgwrap { border: 0.7pt solid #cbd5e1; border-radius: 3pt; padding: 8pt; background: #fff; }
+  .svgwrap svg { width: 100%; height: auto; display: block; }
+
+  /* ---- callouts ---- */
+  .note { border-left: 3px solid #4f46e5; background: #f5f6ff; padding: 8pt 11pt; margin: 10pt 0; font-size: 9.4pt; page-break-inside: avoid; }
+  .warn { border-left: 3px solid #d97706; background: #fffbeb; padding: 8pt 11pt; margin: 10pt 0; font-size: 9.4pt; page-break-inside: avoid; }
+  .note b, .warn b { display: block; margin-bottom: 2pt; }
+
+  .toc { font-size: 10pt; }
+  .toc div { display: flex; padding: 3.6pt 0; border-bottom: 0.5pt dotted #cbd5e1; }
+  .toc .n { width: 26pt; color: #4f46e5; font-weight: 650; }
+  .toc .l { flex: 1; }
+  .toc .s { color: #64748b; font-size: 8.8pt; }
+
+  .two { display: flex; gap: 14pt; }
+  .two > div { flex: 1; }
+  .kpi { border: 0.7pt solid #dbe2ea; border-radius: 4pt; padding: 7pt 9pt; }
+  .kpi .v { font-size: 15pt; font-weight: 700; color: #0f172a; }
+  .kpi .k { font-size: 8.2pt; text-transform: uppercase; letter-spacing: 0.7px; color: #64748b; }
+  .avoid { page-break-inside: avoid; }
+  h2.newpage { page-break-before: always; margin-top: 0; }
+  code { font-family: "Cascadia Mono", Consolas, monospace; font-size: 8.6pt; background: #f1f5f9; padding: 0.5pt 3pt; border-radius: 2pt; }
+</style>
+</head>
+<body>
+
+<!-- ============================ COVER ============================ -->
+<div class="cover">
+  <div class="inst">
+    <div class="name">MIT ACADEMY OF ENGINEERING</div>
+    <div class="sub">ALANDI (D), PUNE &nbsp;·&nbsp; SCHOOL OF COMPUTER ENGINEERING (SOFTWARE ENGINEERING)</div>
+  </div>
+
+  <div class="mid">
+    <div class="kicker">Software Prototype Report</div>
+    <div class="title">UniSync AI</div>
+    <div class="tagline">
+      Intelligent Academic Coordination &amp; Personalized Student Support —
+      a multi-tenant platform that unifies academic signals, explains student risk,
+      and keeps a named human in control of every consequential action.
+    </div>
+
+    <div class="meta">
+      <div><b>2026–2027</b>Academic Year</div>
+      <div><b>SY B.Tech</b>Computer Engineering (Software Engineering)</div>
+      <div><b>Group 2</b>Four members</div>
+    </div>
+
+    <table style="margin-top:22pt">
+      <thead>
+        <tr><th style="width:26%">PRN No.</th><th style="width:38%">Branch</th><th>Name of Student</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>202501100058</td><td>Computer Engineering (Software Engineering)</td><td>Aditya Mendhe</td></tr>
+        <tr><td>202501100051</td><td>Computer Engineering (Software Engineering)</td><td>Gaurav Kotkar</td></tr>
+        <tr><td>202501100046</td><td>Computer Engineering (Software Engineering)</td><td>Sumit Tayade</td></tr>
+        <tr><td>202501100056</td><td>Computer Engineering (Software Engineering)</td><td>Vishal Daregave</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="foot">
+    <span>Software Prototyping · Group No. 2</span>
+    <span>MIT Academy of Engineering, Alandi (D), Pune</span>
+  </div>
+</div>
+
+<!-- ============================ CERTIFICATE ============================ -->
+<h1 class="chapter">Certificate</h1>
+<div class="rule"></div>
+<p style="margin-top:16pt; text-align:justify; line-height:1.8;">
+  This is to certify that the Software Prototype Project entitled
+  <b>“UniSync AI – Intelligent Academic Coordination &amp; Personalized Student Support”</b>
+  has been carried out by <b>Group No. 2</b> of SY B.Tech Computer Engineering (Software Engineering)
+  under the guidance of <b>Dr. Manish Giri</b>, Course Instructor, in partial fulfilment of the
+  requirements of the Software Prototyping course during the academic year 2026–2027.
+</p>
+<p style="text-align:justify; line-height:1.8;">
+  The project work presented in this report is the original work carried out by the students and has
+  been completed as per the curriculum prescribed by Savitribai Phule Pune University.
+</p>
+
+<div style="margin-top:80pt; display:flex; justify-content:space-between; font-size:9.6pt;">
+  <div>
+    <div style="border-top:0.8pt solid #0f172a; width:180pt; padding-top:4pt;">Dr. Manish Giri</div>
+    <div style="color:#475569;">Course Instructor</div>
+  </div>
+  <div>
+    <div style="border-top:0.8pt solid #0f172a; width:180pt; padding-top:4pt;">Head of Department</div>
+    <div style="color:#475569;">School of Computer Engineering</div>
+  </div>
+</div>
+
+<!-- ============================ ACKNOWLEDGEMENT ============================ -->
+<h1 class="chapter">Acknowledgement</h1>
+<div class="rule"></div>
+<p style="margin-top:14pt; line-height:1.8;">
+  We would like to express our sincere gratitude to our respected Software Prototyping course
+  instructor, <b>Dr. Manish Giri</b>, for providing us with valuable guidance, continuous
+  encouragement, and constructive suggestions throughout the development of our software
+  prototype project.
+</p>
+<p style="line-height:1.8;">
+  We are also thankful to <b>MIT Academy of Engineering</b> for providing us with the opportunity
+  and the necessary resources to complete this project successfully.
+</p>
+<p style="line-height:1.8;">
+  Finally, we thank all our team members for their cooperation, dedication, and teamwork throughout
+  every phase of this project, including problem identification, AEIOU analysis, the Software
+  Requirement Specification, UML design, database design, and prototype development.
+</p>
+<div style="margin-top:30pt; font-size:10pt;">
+  <b>Group Members</b>
+  <ul style="margin-top:6pt;">
+    <li>Aditya Mendhe</li>
+    <li>Gaurav Kotkar</li>
+    <li>Sumit Tayade</li>
+    <li>Vishal Daregave</li>
+  </ul>
+</div>
+
+<!-- ============================ ABSTRACT ============================ -->
+<h1 class="chapter">Abstract</h1>
+<div class="rule"></div>
+<p style="margin-top:12pt;">
+  Educational institutions operate ERP, learning-management, attendance and examination systems in
+  parallel. Students and advisors therefore reconstruct academic state by hand from several portals,
+  and no single system is responsible for noticing that a student is drifting until it is too late to
+  intervene.
+</p>
+<p>
+  UniSync AI unifies those signals into one tenant-isolated academic record and places a governance
+  layer on top of it. The platform is organised around four engines: <b>Fabric</b> reads institutional
+  data sources in place rather than copying them; the <b>Agent Graph</b> exposes the relationships
+  between students, subjects, staff and interventions; <b>Cortex</b> orchestrates the reasoning
+  workflows; and <b>Arbiter</b> holds every consequential action behind a named human approval.
+</p>
+<p>
+  Two properties are treated as non-negotiable. Risk scoring is <b>deterministic</b>: weighted
+  features with piecewise severity, where every contribution is stored and displayed so an advisor can
+  re-derive the number rather than trust it. And <b>agents cannot write</b>: they may only propose, and
+  an executor runs only after an approval has been written in its own committed transaction.
+</p>
+<p>
+  This report documents the design and the working prototype. The relational core is real — a
+  PostgreSQL 16 schema of <b>seventeen tenant-scoped tables</b>, row-level security enabled and forced
+  on every one, composite tenant foreign keys that make cross-tenant references structurally
+  impossible, and <b>fifty automated database tests</b>. The interface is a presentation prototype of
+  <b>seven screens</b> driven by sample data; it does not read from the database and it makes no model
+  calls. Authentication, the audit-ledger writer and the executor services are designed and specified,
+  but not yet implemented.
+</p>
+<div class="warn" style="margin-top:12pt;">
+  <b>A note on the word “prototype”</b>
+  This report distinguishes four states throughout: <i>implemented and verified</i>, <i>working
+  prototype</i> (a real interface over sample data), <i>designed</i> (specified, not built), and
+  <i>planned</i>. Where a screen exists but its data does not come from the database, the report says so.
+</div>
+<p style="font-size:9.2pt; color:#475569;">
+  <b>Keywords:</b> academic management, ERP, learning management system, student information system,
+  multi-tenant architecture, row-level security, explainable risk scoring, human-in-the-loop, software
+  prototype, AEIOU framework, UML, SRS.
+</p>
+
+<!-- ============================ CONTENTS ============================ -->
+<h1 class="chapter">Contents</h1>
+<div class="rule"></div>
+<div class="toc" style="margin-top:10pt;">
+  <div><span class="n"></span><span class="l">Abstract</span></div>
+  <div><span class="n">1</span><span class="l">Introduction<span class="s"> — problem statement, background and motivation, AEIOU framework</span></span></div>
+  <div><span class="n">1.1</span><span class="l">Problem Statement</span></div>
+  <div><span class="n">1.2</span><span class="l">Background and Motivation</span></div>
+  <div><span class="n">1.3</span><span class="l">AEIOU Framework</span></div>
+  <div><span class="n">2</span><span class="l">Requirement Analysis<span class="s"> — user requirements, SRS, limitations, analysis</span></span></div>
+  <div><span class="n">2.1</span><span class="l">User Requirements</span></div>
+  <div><span class="n">2.2</span><span class="l">SRS — Non-Functional Requirements</span></div>
+  <div><span class="n">2.3</span><span class="l">SRS — Functional Requirements</span></div>
+  <div><span class="n">2.4</span><span class="l">Limitations</span></div>
+  <div><span class="n">2.5</span><span class="l">Analysis</span></div>
+  <div><span class="n">3</span><span class="l">Design Documents<span class="s"> — UML, database design, security model</span></span></div>
+  <div><span class="n">3.1</span><span class="l">UML Diagrams — Use Case, Activity, Sequence</span></div>
+  <div><span class="n">3.2</span><span class="l">Low Fidelity and High Fidelity Prototype</span></div>
+  <div><span class="n">3.3</span><span class="l">Database Design</span></div>
+  <div><span class="n">3.4</span><span class="l">Isolation and Governance Invariants</span></div>
+  <div><span class="n">4</span><span class="l">Working Prototype UI Design<span class="s"> — seven screens</span></span></div>
+  <div><span class="n">5</span><span class="l">Conclusion</span></div>
+  <div><span class="n">6</span><span class="l">References</span></div>
+</div>
+
+<!-- ============================ CHAPTER 1 ============================ -->
+<h1 class="chapter"><span class="num">1</span>Introduction</h1>
+<div class="accent"></div>
+<p>
+  The rapid digital transformation in educational institutions has led to the adoption of many
+  academic platforms — ERP systems, learning management systems, attendance portals, examination
+  portals and messaging channels. Each of these systems performs its own function adequately, but they
+  operate independently. The consequence is not merely inconvenience: no single system is responsible
+  for the student as a whole, so the signals that together indicate a student is at risk stay separated
+  across four databases and three logins.
+</p>
+<p>
+  UniSync AI addresses both halves of that problem. It unifies academic information into one
+  tenant-isolated record, and it adds the layer that fragmented systems never provide — a layer that
+  notices a pattern, explains it with evidence, drafts the next step, and then stops and waits for a
+  human being to approve it.
+</p>
+
+<h2>1.1 Problem Statement</h2>
+
+<h3>1.1.1 Problem</h3>
+<p>
+  In many institutions, academic information is distributed across ERP systems, learning management
+  systems, attendance portals, examination portals and communication channels. Students and faculty
+  must repeatedly switch between these systems to reach attendance, marks, assignments, notifications
+  and academic records.
+</p>
+<p>
+  This fragmentation produces poor academic coordination, delayed communication and increased
+  administrative effort. More seriously, it delays <b>detection</b>: a student who has stopped
+  attending one subject, missed two submissions and slipped twelve marks behind is visible in three
+  systems, but is visible as a whole in none of them. By the time the pattern is noticed by a person,
+  the correction window has usually closed.
+</p>
+
+<h3>1.1.2 Solution</h3>
+<p>
+  Develop a web application that unifies academic information from multiple institutional systems into
+  a single platform, and adds a governance layer over it. The platform must:
+</p>
+<ul>
+  <li>present a student's attendance, marks, submissions and risk factors in one place;</li>
+  <li>surface the students who need attention, ranked, with the evidence behind each ranking;</li>
+  <li>allow an advisor to ask questions about a record and receive grounded, cited answers;</li>
+  <li>draft the next intervention automatically, and then require a named human approval before any
+      record is changed;</li>
+  <li>keep every institution's data isolated at the database level, not only in application code.</li>
+</ul>
+
+<h3>1.1.3 Final Problem Statement</h3>
+<p style="border-left:3px solid #0f172a; padding-left:10pt; font-size:10.8pt;">
+  Design and implementation of a multi-tenant web application that unifies fragmented academic
+  information into a single governed platform, identifies students requiring support through a
+  deterministic and explainable risk assessment, and ensures that no consequential academic action is
+  executed without a named human approval and an audit record.
+</p>
+
+<h2>1.2 Background and Motivation</h2>
+<p>
+  Educational institutions have rapidly adopted digital technologies for managing academic activities.
+  However, most institutions still rely on multiple independent systems, each with its own login,
+  identifier and export. Students struggle to track attendance, assignments, results and progress
+  because the information is scattered. Faculty spend significant time re-entering the same updates in
+  different systems. Administrators struggle to keep records consistent across all of them.
+</p>
+<p>
+  A second problem sits underneath the first. The systems that do hold this data are <b>systems of
+  record</b>, not systems of <b>attention</b>. They answer “what is this student's attendance?” but
+  never “which students should I speak to this week, and why?”. That question currently gets answered
+  by memory, by hallway conversation, and by whoever happens to notice.
+</p>
+<p>
+  The motivation behind UniSync AI is therefore twofold: to remove the mechanical cost of living in
+  several portals, and to make early academic support a repeatable, evidence-backed process rather
+  than an accident of who was paying attention.
+</p>
+
+<h3>1.2.1 Objectives</h3>
+<ol>
+  <li>Integrate academic information from institutional systems into one record per student.</li>
+  <li>Detect academic risk early, deterministically, with evidence an advisor can verify.</li>
+  <li>Keep a named human in control of every consequential academic action.</li>
+  <li>Guarantee tenant isolation in the database, not only in application code.</li>
+  <li>Make every automated step auditable and attributable.</li>
+  <li>Give an advisor the whole picture — attendance, marks, relationships, history — in one screen.</li>
+  <li>Remain operable by a small institution without a dedicated data team.</li>
+</ol>
+
+<h2>1.3 AEIOU Framework</h2>
+<p>
+  The AEIOU framework is a user-centred observation technique used during the Design Thinking process
+  to understand user behaviour, identify existing problems, and collect requirements before developing
+  a software solution. AEIOU consists of five elements: <b>A</b> – Activities, <b>E</b> – Environment,
+  <b>I</b> – Interactions, <b>O</b> – Objects, and <b>U</b> – Users. The observations collected using
+  these five components identified the real problems that guided this prototype.
+</p>
+
+<h3>1.3.1 Activities (A)</h3>
+<p>
+  The Activity sheet records the daily academic tasks performed by students, faculty and
+  administrators: student registration and login; checking attendance and marks; viewing and uploading
+  assignments; uploading marks; managing academic records; and sending or receiving notifications.
+  These observations exposed the repetition — the same attendance entry typed into a register, then an
+  ERP, then a spreadsheet — and the gaps, where an activity has no owner at all.
+</p>
+
+<h3>1.3.2 Environment (E)</h3>
+<p>
+  The Environment sheet focuses on where academic activity physically and digitally takes place: the
+  campus, classrooms, computer laboratories, ERP systems, learning management systems and
+  administrative offices. Studying these environments showed that the digital environments are
+  partitioned by role and by department, so information crosses them only through people.
+</p>
+
+<h3>1.3.3 Interactions (I)</h3>
+<p>
+  The Interaction sheet examines how students, faculty and administrators exchange academic
+  information: faculty sharing assignments, students submitting work, attendance updates, academic
+  announcements, result publication and communication through ERP and LMS portals. The recurring
+  finding was that support conversations happen outside every system — in person and on messaging
+  apps — and are therefore invisible to the institution.
+</p>
+
+<h3>1.3.4 Objects (O)</h3>
+<p>
+  The Object sheet identifies the physical and digital objects in use: student identity cards, ERP and
+  LMS dashboards, mark sheets, attendance registers, assignment documents, course information and
+  notification panels. These objects were the raw material for the unified record.
+</p>
+
+<h3>1.3.5 Users (U)</h3>
+<p>
+  The User sheet identifies every stakeholder: students, faculty members (including academic
+  advisors), and administrators. Each has different responsibilities and different questions of the
+  system. The prototype is designed around the advisor's question — “who needs me this week, and
+  why?” — because that is the role where the absence of a unified view has the highest cost.
+</p>
+
+<!-- ============================ CHAPTER 2 ============================ -->
+<h1 class="chapter"><span class="num">2</span>Requirement Analysis</h1>
+<div class="accent"></div>
+
+<h2>2.1 User Requirements</h2>
+<p>Based on the AEIOU observations, the following user requirements were identified.</p>
+
+<h3>Student</h3>
+<ul>
+  <li>See attendance, marks, submissions and deadlines for the current term in one place.</li>
+  <li>Understand why the system considers them at risk, in terms they can act on.</li>
+  <li>Ask questions about their own record and receive answers grounded in that record and in
+      published regulations — not generic advice.</li>
+  <li>See clearly when a request about their record is waiting for an advisor's approval.</li>
+</ul>
+
+<h3>Faculty / Academic Advisor</h3>
+<ul>
+  <li>See every student who needs attention, ranked, with the specific driver behind each ranking.</li>
+  <li>Verify the number: re-derive a risk score from its weighted contributions.</li>
+  <li>Review a drafted intervention, edit it, approve it, or reject it with a reason.</li>
+  <li>Know exactly what a proposed action will write before approving it.</li>
+  <li>See the intervention history for a student, including outcomes.</li>
+</ul>
+
+<h3>Administrator</h3>
+<ul>
+  <li>Manage the institution, departments, terms, subjects, offerings, users, faculty and students.</li>
+  <li>Monitor the health of connected data sources and see when a sync fails or degrades.</li>
+  <li>Be certain that one institution's data can never be read through another institution's context.</li>
+  <li>Inspect an attributable history of consequential actions.</li>
+</ul>
+
+<h2>2.2 SRS — Non-Functional Requirements</h2>
+<p>
+  Non-functional requirements describe the qualities and constraints of the system as a whole. For
+  this project they are not decoration: several of them are the product.
+</p>
+<ol>
+  <li><b>Tenant isolation.</b> Every tenant-scoped table carries a non-null institution identifier and
+      row-level security that is both enabled and forced. Cross-tenant references must be impossible
+      structurally, not merely rejected by application code.</li>
+  <li><b>Determinism.</b> The risk score must be a pure function of stored features. The same inputs
+      must produce the same score, and every contribution must be stored and displayable.</li>
+  <li><b>Human authority.</b> No agent, workflow or model may write to an academic record. Writes
+      occur only after an approval row has been committed by a named user.</li>
+  <li><b>Auditability.</b> Every consequential action is attributable to an actor, a time and a
+      reason.</li>
+  <li><b>Least privilege.</b> The runtime database role owns no table, cannot truncate, cannot alter
+      policies, and cannot bypass row-level security.</li>
+  <li><b>Responsiveness.</b> The interface must remain usable from a laptop to a tablet, with tables
+      that degrade gracefully rather than overflow.</li>
+  <li><b>Legibility of provenance.</b> Text produced by a language model must be labelled as
+      generated, and numeric claims must be substituted from stored facts rather than written by the
+      model.</li>
+</ol>
+
+<h2>2.3 SRS — Functional Requirements</h2>
+<p>
+  Functional requirements describe what the system must do. The table below lists each function once,
+  shows which roles may use it, and — importantly for this report — states its current status.
+</p>
+
+<table class="t">
+  <thead>
+    <tr>
+      <th style="width:5%">No.</th>
+      <th style="width:40%">Function</th>
+      <th class="c" style="width:9%">Student</th>
+      <th class="c" style="width:9%">Advisor</th>
+      <th class="c" style="width:9%">Admin</th>
+      <th style="width:28%">Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="6" style="background:#eef2f7; font-weight:650; color:#0f172a;">Platform foundation</td></tr>
+    <tr><td>1</td><td>Tenant-isolated relational core</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-done">Implemented &amp; verified</span></td></tr>
+    <tr><td>2</td><td>Row-level security on every tenant table</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-done">Implemented &amp; verified</span></td></tr>
+    <tr><td>3</td><td>Automated database tests</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-done">50 passing</span></td></tr>
+
+    <tr><td colspan="6" style="background:#eef2f7; font-weight:650; color:#0f172a;">Common</td></tr>
+    <tr><td>4</td><td>Register an account</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td><td><span class="pill p-des">Designed</span></td></tr>
+    <tr><td>5</td><td>Log in / establish a session</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill p-des">Designed</span></td></tr>
+    <tr><td>6</td><td>Forgot and reset password</td><td class="c">✓</td><td class="c">✓</td><td class="c">—</td><td><span class="pill p-des">Designed</span></td></tr>
+    <tr><td>7</td><td>Role-appropriate landing screen</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill p-proto">Advisor view only</span></td></tr>
+
+    <tr><td colspan="6" style="background:#eef2f7; font-weight:650; color:#0f172a;">Student</td></tr>
+    <tr><td>8</td><td>View academic profile, marks and attendance</td><td class="c">✓</td><td class="c">✓</td><td class="c">—</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>9</td><td>Understand own risk factors</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>10</td><td>Ask the academic advisor (grounded Q&amp;A)</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td><td><span class="pill p-proto">Prototype (scripted)</span></td></tr>
+    <tr><td>11</td><td>Receive notifications</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td><td><span class="pill p-plan">Planned</span></td></tr>
+
+    <tr><td colspan="6" style="background:#eef2f7; font-weight:650; color:#0f172a;">Advisor</td></tr>
+    <tr><td>12</td><td>Institution command dashboard</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>13</td><td>Student intelligence view</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>14</td><td>Explainable risk breakdown (weight × severity)</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td><span class="pill p-proto">Prototype · engine designed</span></td></tr>
+    <tr><td>15</td><td>Review a proposed action with its evidence</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>16</td><td>Approve, edit or reject with a reason</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td><span class="pill p-proto">Prototype (simulated)</span></td></tr>
+    <tr><td>17</td><td>Intervention history and outcomes</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>18</td><td>Record attendance and marks</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td><span class="pill p-plan">Planned</span></td></tr>
+
+    <tr><td colspan="6" style="background:#eef2f7; font-weight:650; color:#0f172a;">Administrator</td></tr>
+    <tr><td>19</td><td>Manage users, faculty, students and courses</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-plan">Planned</span></td></tr>
+    <tr><td>20</td><td>Approve student registrations</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-plan">Planned</span></td></tr>
+    <tr><td>21</td><td>Generate academic reports</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-plan">Planned</span></td></tr>
+    <tr><td>22</td><td>Monitor data-source health (Fabric)</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-proto">Prototype (sample)</span></td></tr>
+    <tr><td>23</td><td>Relationship map (Agent Graph)</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td><td><span class="pill p-proto">Prototype</span></td></tr>
+
+    <tr><td colspan="6" style="background:#eef2f7; font-weight:650; color:#0f172a;">Platform services</td></tr>
+    <tr><td>24</td><td>Audit ledger of consequential actions</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-des">Designed</span></td></tr>
+    <tr><td>25</td><td>Deterministic risk engine service</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-des">Designed</span></td></tr>
+    <tr><td>26</td><td>Agent orchestration (propose only)</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-des">Designed</span></td></tr>
+    <tr><td>27</td><td>Executor services (approved writes only)</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td><span class="pill p-des">Designed</span></td></tr>
+  </tbody>
+</table>
+<div class="caption">Table 2.1 — Functional requirements of UniSync AI by role, with implementation status.</div>
+
+<h3>2.3.1 Functional specifications</h3>
+<p>Three representative functions are specified below in the standard form.</p>
+
+<table class="t">
+  <tbody>
+    <tr><td style="width:18%; font-weight:650;">Name</td><td>13. Student Intelligence View</td></tr>
+    <tr><td style="font-weight:650;">Purpose</td><td>Present one student's complete academic situation — attendance, marks, risk drivers, relationships and support history — to their advisor.</td></tr>
+    <tr><td style="font-weight:650;">Input</td><td>Student identifier, within an authenticated tenant context.</td></tr>
+    <tr><td style="font-weight:650;">Output</td><td>Profile, per-subject attendance and weighted marks, a twelve-week attendance map, a risk score with its contributions, and the intervention timeline.</td></tr>
+    <tr><td style="font-weight:650;">Users</td><td>Faculty / Advisor</td></tr>
+    <tr><td style="font-weight:650;">Pre-condition</td><td>A tenant context is bound to the transaction; the reader may see this student.</td></tr>
+    <tr><td style="font-weight:650;">Post-condition</td><td>Nothing is written. The view is read-only by construction.</td></tr>
+  </tbody>
+</table>
+
+<table class="t">
+  <tbody>
+    <tr><td style="width:18%; font-weight:650;">Name</td><td>16. Approve, Edit or Reject a Proposed Action</td></tr>
+    <tr><td style="font-weight:650;">Purpose</td><td>Give a named human the decision over an action drafted by an agent.</td></tr>
+    <tr><td style="font-weight:650;">Input</td><td>Proposed action identifier, decision (approve / edit / reject), optional edited text, mandatory reason when rejecting.</td></tr>
+    <tr><td style="font-weight:650;">Output</td><td>An approval record, a status transition on the proposed action, and an audit entry. On approval only, the executor becomes eligible to run.</td></tr>
+    <tr><td style="font-weight:650;">Users</td><td>Faculty / Advisor (the assignee, or a delegate)</td></tr>
+    <tr><td style="font-weight:650;">Pre-condition</td><td>The action is still in the <code>proposed</code> state and within its SLA.</td></tr>
+    <tr><td style="font-weight:650;">Post-condition</td><td>The decision is durable and attributable; no academic record is modified by the approval itself.</td></tr>
+  </tbody>
+</table>
+
+<table class="t">
+  <tbody>
+    <tr><td style="width:18%; font-weight:650;">Name</td><td>10. Ask the Academic Advisor</td></tr>
+    <tr><td style="font-weight:650;">Purpose</td><td>Answer a question about the student's own record in plain language, with the evidence attached.</td></tr>
+    <tr><td style="font-weight:650;">Input</td><td>A free-text question, scoped to the authenticated student.</td></tr>
+    <tr><td style="font-weight:650;">Output</td><td>An answer carrying citations to either a stored fact or a published regulation; a proposed request when the question implies a record change.</td></tr>
+    <tr><td style="font-weight:650;">Users</td><td>Student</td></tr>
+    <tr><td style="font-weight:650;">Pre-condition</td><td>Login successful; the record exists within the tenant.</td></tr>
+    <tr><td style="font-weight:650;">Post-condition</td><td>No record is modified. Anything consequential becomes a pending approval, never an executed change.</td></tr>
+  </tbody>
+</table>
+
+<h2>2.4 Limitations</h2>
+<p>The following limitations apply to the prototype presented in this report. They are stated
+   deliberately rather than discovered later.</p>
+<ul>
+  <li>The interface is driven by <b>sample data</b>. No screen reads from the database, and no screen
+      writes to it.</li>
+  <li>Authentication is <b>designed but not implemented</b>. The prototype has no login; the tenant
+      context that the real system would establish after login is simulated.</li>
+  <li>No language model is called. The academic advisor screen is a <b>keyword-matched script</b> that
+      demonstrates the interaction pattern — citations, provenance labels and the approval hand-off.</li>
+  <li>Approvals on the Arbiter screen are simulated in browser memory. They demonstrate the workflow
+      and the receipt, and they reset on reload.</li>
+  <li>The risk contributions displayed are computed by the same weighting rule the engine specifies,
+      but the engine service itself is not yet implemented.</li>
+  <li>Only the advisor-facing journey is presented. The student and administrator journeys are
+      planned.</li>
+  <li>The prototype is not connected to any live ERP, LMS or examination system. Fabric presents the
+      integration model and its health states; the connectors do not exist.</li>
+  <li>Three account roles are defined in the schema (student, faculty, administrator). Counselling
+      support is part of the product design but its role model is still under review.</li>
+</ul>
+<div class="note">
+  <b>Why these limitations are stated first</b>
+  A prototype that is honest about its boundary is more useful than one that is not: an examiner can
+  evaluate the design on its merits, and a reader can tell exactly which claims are verified.
+</div>
+
+<h2>2.5 Analysis</h2>
+<p>
+  The AEIOU observations were converted into requirements and then into features. The mapping is shown
+  below, together with the state each feature has reached.
+</p>
+
+<table class="t">
+  <thead>
+    <tr>
+      <th style="width:30%">Observation (AEIOU)</th>
+      <th style="width:26%">Requirement</th>
+      <th style="width:26%">Feature</th>
+      <th style="width:18%">State</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Information scattered across ERP, LMS and portals</td><td>One place to view academic data</td><td>Student intelligence view; Fabric</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>Risk noticed too late, by memory</td><td>Early, explainable detection</td><td>Deterministic risk score with contributions</td><td><span class="pill p-proto">Prototype · engine designed</span></td></tr>
+    <tr><td>Support conversations happen outside every system</td><td>Record what was done and what happened</td><td>Intervention history</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>Automation is distrusted in academic settings</td><td>Human authority over every write</td><td>Arbiter approval centre</td><td><span class="pill p-proto">Prototype</span></td></tr>
+    <tr><td>Institutions cannot share a deployment safely</td><td>Isolation in the database</td><td>RLS + composite tenant keys</td><td><span class="pill p-done">Implemented</span></td></tr>
+    <tr><td>Faculty repeat data entry</td><td>Single entry point</td><td>Attendance and marks capture</td><td><span class="pill p-plan">Planned</span></td></tr>
+    <tr><td>Administrators cannot see system health</td><td>Integration monitoring</td><td>Fabric source status and sync runs</td><td><span class="pill p-proto">Prototype (sample)</span></td></tr>
+  </tbody>
+</table>
+<div class="caption">Table 2.2 — Mapping of observations to requirements, features, and current state.</div>
+
+<!-- ============================ CHAPTER 3 ============================ -->
+<h1 class="chapter"><span class="num">3</span>Design Documents</h1>
+<div class="accent"></div>
+<p>
+  This chapter presents the system design: the UML views that describe behaviour, the relational
+  design that enforces isolation, and the invariants that govern what the system is allowed to do.
+  The diagrams were produced for the system as designed — not as initially imagined — and therefore
+  differ in places from an ordinary CRUD academic portal.
+</p>
+
+<h2>3.1 UML Diagrams</h2>
+<p>
+  Unified Modeling Language is a standard graphical language for visualising and documenting a system.
+  Three views are used here: a <b>use case</b> diagram for the actors and their goals, an
+  <b>activity</b> diagram for the end-to-end flow including the human decision, and a <b>sequence</b>
+  diagram for the messages exchanged during a review and approval.
+</p>
+
+<h3>3.1.1 Use Case Diagram</h3>
+<p>
+  Three actors interact with the system: the Student, the Faculty member acting as academic advisor,
+  and the Administrator. The boundary encloses the platform. Note that “Request a record change” is
+  separate from “Approve a request”: the student may ask, but only the advisor may authorise.
+</p>
+
+<div class="svgwrap">
+<svg viewBox="0 0 940 520" role="img" aria-label="Use case diagram">
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <!-- system boundary -->
+  <rect x="196" y="40" width="620" height="450" rx="8" fill="#fbfcfe" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="506" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#334155">UniSync AI Platform</text>
+
+  <!-- actors -->
+  <g stroke="#334155" stroke-width="1.4" fill="none">
+    <circle cx="86" cy="112" r="9" fill="#fff"/>
+    <line x1="86" y1="121" x2="86" y2="146"/>
+    <line x1="70" y1="130" x2="102" y2="130"/>
+    <line x1="86" y1="146" x2="74" y2="164"/>
+    <line x1="86" y1="146" x2="98" y2="164"/>
+
+    <circle cx="86" cy="292" r="9" fill="#fff"/>
+    <line x1="86" y1="301" x2="86" y2="326"/>
+    <line x1="70" y1="310" x2="102" y2="310"/>
+    <line x1="86" y1="326" x2="74" y2="344"/>
+    <line x1="86" y1="326" x2="98" y2="344"/>
+  </g>
+  <text x="86" y="188" text-anchor="middle" font-size="10" font-weight="600" fill="#0f172a">Student</text>
+  <text x="86" y="368" text-anchor="middle" font-size="10" font-weight="600" fill="#0f172a">Advisor</text>
+
+  <g stroke="#334155" stroke-width="1.4" fill="none">
+    <circle cx="880" cy="252" r="9" fill="#fff"/>
+    <line x1="880" y1="261" x2="880" y2="286"/>
+    <line x1="864" y1="270" x2="896" y2="270"/>
+    <line x1="880" y1="286" x2="868" y2="304"/>
+    <line x1="880" y1="286" x2="892" y2="304"/>
+  </g>
+  <text x="880" y="328" text-anchor="middle" font-size="10" font-weight="600" fill="#0f172a">Administrator</text>
+
+  <!-- use cases: column A (student) -->
+  <g font-size="8.6" fill="#0f172a" text-anchor="middle">
+    <ellipse cx="330" cy="110" rx="94" ry="24" fill="#e0e7ff" stroke="#6366f1"/>
+    <text x="330" y="113">View own academic record</text>
+
+    <ellipse cx="330" cy="186" rx="94" ry="24" fill="#e0e7ff" stroke="#6366f1"/>
+    <text x="330" y="189">Ask the academic advisor</text>
+
+    <ellipse cx="330" cy="262" rx="94" ry="24" fill="#e0e7ff" stroke="#6366f1"/>
+    <text x="330" y="265">Request a record change</text>
+  </g>
+
+  <!-- use cases: column B (advisor + admin) -->
+  <g font-size="8.6" fill="#0f172a" text-anchor="middle">
+    <ellipse cx="576" cy="110" rx="104" ry="24" fill="#dcfce7" stroke="#10b981"/>
+    <text x="576" y="113">Review risk assessment</text>
+
+    <ellipse cx="576" cy="186" rx="104" ry="24" fill="#dcfce7" stroke="#10b981"/>
+    <text x="576" y="189">Approve / edit / reject action</text>
+
+    <ellipse cx="576" cy="262" rx="104" ry="24" fill="#dcfce7" stroke="#10b981"/>
+    <text x="576" y="265">Record an intervention</text>
+
+    <ellipse cx="576" cy="352" rx="104" ry="24" fill="#fef3c7" stroke="#f59e0b"/>
+    <text x="576" y="355">Manage data sources</text>
+
+    <ellipse cx="576" cy="428" rx="104" ry="24" fill="#fef3c7" stroke="#f59e0b"/>
+    <text x="576" y="431">Inspect the audit trail</text>
+  </g>
+
+  <!-- associations -->
+  <g stroke="#64748b" stroke-width="1.1" fill="none">
+    <line x1="104" y1="118" x2="234" y2="112"/>
+    <line x1="104" y1="124" x2="234" y2="184"/>
+    <line x1="104" y1="130" x2="234" y2="256"/>
+
+    <line x1="104" y1="300" x2="470" y2="118"/>
+    <line x1="104" y1="302" x2="470" y2="184"/>
+    <line x1="104" y1="304" x2="470" y2="258"/>
+
+    <line x1="864" y1="266" x2="680" y2="348"/>
+    <line x1="868" y1="276" x2="680" y2="424"/>
+  </g>
+
+  <!-- note -->
+  <text x="506" y="482" text-anchor="middle" font-size="8.2" fill="#64748b" font-style="italic">
+    A request and an approval are separate use cases: the student may ask, only the advisor may authorise.
+  </text>
+</svg>
+</div>
+<div class="caption">Figure 3.1 — Use case diagram of UniSync AI.</div>
+
+<h3>3.1.2 Activity Diagram</h3>
+<p>
+  The activity diagram follows the path from a student record being opened to an approved action being
+  executed. The decisive feature is the second decision node: the executor is reached only through an
+  approval, and a rejection still produces an audit record.
+</p>
+
+<div class="svgwrap">
+<svg viewBox="0 0 760 760" role="img" aria-label="Activity diagram">
+  <defs>
+    <marker id="a2" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <!-- start -->
+  <circle cx="300" cy="26" r="9" fill="#0f172a"/>
+  <line x1="300" y1="35" x2="300" y2="58" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+
+  <g font-size="9" fill="#0f172a" text-anchor="middle">
+    <rect x="150" y="60" width="300" height="34" rx="6" fill="#eef2f7" stroke="#94a3b8"/>
+    <text x="300" y="81">Advisor opens a student record</text>
+
+    <line x1="300" y1="94" x2="300" y2="112" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+
+    <rect x="150" y="114" width="300" height="34" rx="6" fill="#eef2f7" stroke="#94a3b8"/>
+    <text x="300" y="135">Tenant context bound for the transaction</text>
+
+    <line x1="300" y1="148" x2="300" y2="166" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+
+    <rect x="150" y="168" width="300" height="34" rx="6" fill="#eef2f7" stroke="#94a3b8"/>
+    <text x="300" y="189">Rows returned through row-level security</text>
+
+    <line x1="300" y1="202" x2="300" y2="220" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+
+    <rect x="150" y="222" width="300" height="34" rx="6" fill="#e0e7ff" stroke="#6366f1"/>
+    <text x="300" y="243">Deterministic score computed with contributions</text>
+
+    <line x1="300" y1="256" x2="300" y2="278" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+
+    <!-- decision 1 -->
+    <polygon points="300,280 392,322 300,364 208,322" fill="#fef3c7" stroke="#d97706"/>
+    <text x="300" y="326" font-size="8.4">score ≥ threshold?</text>
+
+    <!-- no branch -->
+    <line x1="392" y1="322" x2="500" y2="322" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+    <text x="446" y="314" font-size="8" fill="#475569">no</text>
+    <rect x="502" y="305" width="190" height="34" rx="6" fill="#f1f5f9" stroke="#94a3b8"/>
+    <text x="597" y="326">Monitor · no case opened</text>
+
+    <!-- yes branch -->
+    <line x1="300" y1="364" x2="300" y2="392" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+    <text x="312" y="382" font-size="8" fill="#475569">yes</text>
+
+    <rect x="150" y="394" width="300" height="34" rx="6" fill="#eef2f7" stroke="#94a3b8"/>
+    <text x="300" y="415">Risk case opened and assigned to an advisor</text>
+
+    <line x1="300" y1="428" x2="300" y2="446" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+
+    <rect x="150" y="448" width="300" height="34" rx="6" fill="#e0e7ff" stroke="#6366f1"/>
+    <text x="300" y="469">Agent drafts an intervention (cannot write)</text>
+
+    <line x1="300" y1="482" x2="300" y2="504" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+
+    <!-- decision 2 -->
+    <polygon points="300,506 396,552 300,598 204,552" fill="#fef3c7" stroke="#d97706"/>
+    <text x="300" y="556" font-size="8.4">advisor approves?</text>
+
+    <!-- no 2 -->
+    <line x1="396" y1="552" x2="500" y2="552" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+    <text x="448" y="544" font-size="8" fill="#475569">no</text>
+    <rect x="502" y="535" width="190" height="34" rx="6" fill="#ffe4e6" stroke="#f43f5e"/>
+    <text x="597" y="556">Rejection recorded with reason</text>
+
+    <!-- yes 2 -->
+    <line x1="300" y1="598" x2="300" y2="624" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+    <text x="312" y="616" font-size="8" fill="#475569">yes</text>
+
+    <rect x="150" y="626" width="300" height="34" rx="6" fill="#dcfce7" stroke="#10b981"/>
+    <text x="300" y="647">Executor performs the approved write</text>
+
+    <line x1="300" y1="660" x2="300" y2="678" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+
+    <rect x="150" y="680" width="300" height="34" rx="6" fill="#eef2f7" stroke="#94a3b8"/>
+    <text x="300" y="701">Audit entry appended</text>
+
+    <!-- joins to end -->
+    <line x1="300" y1="714" x2="300" y2="730" stroke="#475569" stroke-width="1.2" marker-end="url(#a2)"/>
+    <line x1="730" y1="339" x2="730" y2="740" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="730" y1="569" x2="730" y2="740" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="300" y1="740" x2="730" y2="740" stroke="#94a3b8" stroke-width="1" stroke-dasharray="3 3"/>
+    <circle cx="300" cy="746" r="10" fill="none" stroke="#0f172a" stroke-width="1.4"/>
+    <circle cx="300" cy="746" r="5" fill="#0f172a"/>
+  </g>
+</svg>
+</div>
+<div class="caption">Figure 3.2 — Activity diagram: from record review to approved execution.</div>
+
+<h3>3.1.3 Sequence Diagram</h3>
+<p>
+  The sequence below shows the review-and-approve flow across four participants. Two details matter:
+  the approval is a compare-and-set against the <code>proposed</code> state, and the executor is
+  invoked only after that write has committed.
+</p>
+
+<div class="svgwrap">
+<svg viewBox="0 0 880 560" role="img" aria-label="Sequence diagram">
+  <defs>
+    <marker id="a3" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#475569"/>
+    </marker>
+  </defs>
+
+  <!-- lifelines -->
+  <g font-size="9" text-anchor="middle" fill="#0f172a">
+    <rect x="40" y="14" width="140" height="30" rx="5" fill="#eef2f7" stroke="#94a3b8"/>
+    <text x="110" y="33">Advisor (browser)</text>
+
+    <rect x="250" y="14" width="140" height="30" rx="5" fill="#e0e7ff" stroke="#6366f1"/>
+    <text x="320" y="33">API (FastAPI)</text>
+
+    <rect x="470" y="14" width="150" height="30" rx="5" fill="#dcfce7" stroke="#10b981"/>
+    <text x="545" y="33">PostgreSQL (RLS)</text>
+
+    <rect x="700" y="14" width="150" height="30" rx="5" fill="#fef3c7" stroke="#f59e0b"/>
+    <text x="775" y="33">Executor</text>
+  </g>
+
+  <g stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 4">
+    <line x1="110" y1="44" x2="110" y2="530"/>
+    <line x1="320" y1="44" x2="320" y2="530"/>
+    <line x1="545" y1="44" x2="545" y2="530"/>
+    <line x1="775" y1="44" x2="775" y2="530"/>
+  </g>
+
+  <g font-size="8.2" fill="#334155">
+    <line x1="110" y1="86" x2="318" y2="86" stroke="#475569" stroke-width="1.1" marker-end="url(#a3)"/>
+    <text x="214" y="80" text-anchor="middle">POST /sessions · credentials</text>
+
+    <line x1="320" y1="126" x2="543" y2="126" stroke="#475569" stroke-width="1.1" marker-end="url(#a3)"/>
+    <text x="432" y="120" text-anchor="middle">BEGIN · bind tenant context</text>
+
+    <line x1="320" y1="166" x2="543" y2="166" stroke="#475569" stroke-width="1.1" marker-end="url(#a3)"/>
+    <text x="432" y="160" text-anchor="middle">SELECT student, marks, attendance</text>
+
+    <line x1="545" y1="206" x2="322" y2="206" stroke="#475569" stroke-width="1.1" stroke-dasharray="5 3" marker-end="url(#a3)"/>
+    <text x="432" y="200" text-anchor="middle">rows filtered by policy</text>
+
+    <line x1="320" y1="246" x2="112" y2="246" stroke="#475569" stroke-width="1.1" stroke-dasharray="5 3" marker-end="url(#a3)"/>
+    <text x="214" y="240" text-anchor="middle">200 · record + contributions</text>
+
+    <line x1="110" y1="292" x2="318" y2="292" stroke="#475569" stroke-width="1.1" marker-end="url(#a3)"/>
+    <text x="214" y="286" text-anchor="middle">POST /actions/{id}/approve</text>
+
+    <line x1="320" y1="332" x2="543" y2="332" stroke="#475569" stroke-width="1.1" marker-end="url(#a3)"/>
+    <text x="432" y="326" text-anchor="middle">UPDATE … WHERE status = 'proposed'</text>
+
+    <line x1="545" y1="372" x2="322" y2="372" stroke="#475569" stroke-width="1.1" stroke-dasharray="5 3" marker-end="url(#a3)"/>
+    <text x="432" y="366" text-anchor="middle">1 row (compare-and-set)</text>
+
+    <line x1="320" y1="412" x2="112" y2="412" stroke="#475569" stroke-width="1.1" stroke-dasharray="5 3" marker-end="url(#a3)"/>
+    <text x="214" y="406" text-anchor="middle">202 · decision recorded</text>
+
+    <line x1="320" y1="452" x2="773" y2="452" stroke="#475569" stroke-width="1.1" marker-end="url(#a3)"/>
+    <text x="546" y="446" text-anchor="middle">execute(approved action)</text>
+
+    <line x1="775" y1="492" x2="547" y2="492" stroke="#475569" stroke-width="1.1" marker-end="url(#a3)"/>
+    <text x="660" y="486" text-anchor="middle">INSERT audit entry (append-only)</text>
+  </g>
+
+  <!-- activation bars -->
+  <g fill="#c7d2fe" opacity="0.85">
+    <rect x="316" y="80" width="8" height="42"/>
+    <rect x="316" y="120" width="8" height="132"/>
+    <rect x="316" y="286" width="8" height="132"/>
+    <rect x="316" y="446" width="8" height="16"/>
+    <rect x="771" y="446" width="8" height="54"/>
+  </g>
+</svg>
+</div>
+<div class="caption">Figure 3.3 — Sequence diagram: review, approval, and execution.</div>
+
+<h2>3.2 Low Fidelity and High Fidelity Prototype</h2>
+<h3>3.2.1 Low Fidelity Prototype</h3>
+<p>
+  Low fidelity prototypes address layout, navigation and flow rather than appearance. Early sketches
+  were produced in Canva to agree on the three-panel shape — navigation, list, detail — before any
+  visual design was attempted. These sketches settled one question early: the advisor's primary
+  question is a <i>queue</i>, not a dashboard of charts, so the ranked list became the anchor of the
+  application and the charts became supporting context.
+</p>
+
+<h3>3.2.2 High Fidelity Prototype</h3>
+<p>
+  The high fidelity prototype was built directly in code rather than in a design tool, so that what is
+  demonstrated is what exists. It is a Next.js 15 application using React 19, TypeScript and Tailwind
+  CSS, with a small set of hand-authored interface primitives and charts drawn as inline SVG.
+</p>
+<p><b>Tools used</b></p>
+<ul>
+  <li>Canva — early low fidelity layout sketches.</li>
+  <li>Lucidchart — UML diagrams for this chapter.</li>
+  <li>Next.js 15, React 19, TypeScript 5, Tailwind CSS 3 — the prototype itself.</li>
+  <li>FastAPI, PostgreSQL 16 with pgvector, Redis 7, SQLAlchemy and Alembic — the backend and
+      relational core.</li>
+  <li>Docker Compose — local database and cache.</li>
+</ul>
+
+<h2>3.3 Database Design</h2>
+<p>
+  The relational core is the part of the system that exists in full. It is organised as two migrations:
+  a tenancy foundation, and an academic core. Every table carries <code>institution_id</code>, and every
+  reference between tenant tables is a composite foreign key that includes the institution — so a row
+  in one institution cannot point at a row in another, even if row-level security were disabled.
+</p>
+
+<table class="t">
+  <thead>
+    <tr><th style="width:22%">Migration</th><th style="width:14%">Tables</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>0001 — Tenancy foundation</b></td>
+      <td class="c">6</td>
+      <td><code>institutions</code>, <code>departments</code>, <code>users</code>, <code>faculty</code>,
+          <code>students</code>, <code>advisor_assignments</code> — identity, organisation and the
+          student–advisor relationship.</td>
+    </tr>
+    <tr>
+      <td><b>0002 — Academic core</b></td>
+      <td class="c">11</td>
+      <td><code>terms</code>, <code>subjects</code>, <code>subject_prerequisites</code>,
+          <code>subject_offerings</code>, <code>enrollments</code>, <code>class_sessions</code>,
+          <code>attendance_records</code>, <code>assessments</code>, <code>assignments</code>,
+          <code>marks</code>, <code>submissions</code> — the teaching and assessment model.</td>
+    </tr>
+  </tbody>
+</table>
+<div class="caption">Table 3.1 — The seventeen tenant-scoped tables across two applied migrations.</div>
+
+<p>
+  Three design decisions are worth recording. First, <b>join integrity</b>: attendance, marks and
+  submissions are pinned to the same offering, term and institution as the enrolment they belong to, by
+  four-column composite keys, so a record cannot be attached to the wrong class. Second, <b>deferred
+  constraints</b>: assessment weightings are validated at commit rather than at each statement, which
+  allows a weighting to be rebalanced across several rows in one transaction. Third, <b>explicit
+  indexes on every foreign key</b> — an audit found eleven keys that had no leading-column index, and
+  all were added before the migration was finalised.
+</p>
+
+<h2>3.4 Isolation and Governance Invariants</h2>
+<p>
+  The following invariants are not implementation details; they are the security model, and the test
+  suite asserts them.
+</p>
+<ol>
+  <li><b>Every tenant table carries a non-null institution identifier</b>, and row-level security is
+      both <i>enabled</i> and <i>forced</i>, with a single isolation policy covering both
+      <code>USING</code> and <code>WITH CHECK</code>.</li>
+  <li><b>The tenant context fails closed.</b> The helper function that resolves the current institution
+      returns <code>NULL</code> for a missing <i>and</i> for a malformed value, so an unset context
+      yields no rows rather than all rows.</li>
+  <li><b>The runtime role owns nothing.</b> It cannot truncate, cannot alter policies, and cannot
+      bypass row-level security; a startup guard refuses to boot the application if it is connected as
+      a superuser or with bypass enabled.</li>
+  <li><b>Custom session variables are accident prevention, not a security boundary.</b> The design says
+      so explicitly: the real boundaries are role grants, the absence of bypass, column privileges, and
+      possession of a token.</li>
+  <li><b>Agents cannot write.</b> They emit proposals from a fixed verb allow-list; the executor runs
+      only against an approved row, in its own transaction.</li>
+  <li><b>Generated text carries no invented numbers.</b> Drafts contain fact placeholders that are
+      substituted from stored values at send time.</li>
+</ol>
+
+<!-- ============================ CHAPTER 4 ============================ -->
+<h1 class="chapter"><span class="num">4</span>Working Prototype UI Design</h1>
+<div class="accent"></div>
+<p>
+  This chapter presents the seven screens of the working prototype. They are presented in the order of
+  the demonstration journey: the institution view, then one student, then a conversation, then the
+  governance decision, then the data foundation behind it.
+</p>
+<div class="note">
+  <b>Data notice</b>
+  Every screen below runs on sample data for a fictional tenant, “Alpha University”. No screen reads
+  from the database, no screen writes to it, and no language model is called. The screens demonstrate
+  interaction and information design; the database described in Chapter 3 exists independently.
+</div>
+
+<h2>4.1 Command Dashboard</h2>
+<p>
+  <b>Purpose.</b> Answer “who needs me this week?” in one screen. A rule-separated measure strip states
+  the institution's position without decorating it; the priority queue below is the primary object —
+  each row names the student, the single strongest driver, the owning advisor, the SLA and the score.
+  The right rail carries proportion and history rather than decoration: a stacked risk bar, a
+  twelve-week trend and a compact activity trace. The closing band states the governance rule that
+  shapes the rest of the product: four steps may propose, only the fifth may write.
+</p>
+<figure>
+  <img src="assets/dashboard.png" alt="Command dashboard" />
+  <div class="figcap">Figure 4.1 — Command Dashboard: measure strip, priority queue, risk mix, weekly trend and activity.</div>
+</figure>
+
+<h2 class="newpage">4.2 Student Intelligence</h2>
+<p>
+  <b>Purpose.</b> Present one student's whole situation, and make the risk score verifiable. The
+  breakdown shows each feature's weight and severity and the points it contributes; the five
+  contributions sum to the displayed total. Attendance is shown as a twelve-week map, performance as a
+  per-assessment series, and support work as a timeline. The relationship map on the right shows what
+  else the student is connected to.
+</p>
+<figure>
+  <img src="assets/student.png" alt="Student intelligence view" />
+  <div class="figcap">Figure 4.2 — Student Intelligence: explainable risk breakdown, attendance map, performance and interventions.</div>
+</figure>
+
+<h2 class="newpage">4.3 AI Academic Advisor</h2>
+<p>
+  <b>Purpose.</b> Let a student ask about their own record and get an answer they can check. Every
+  assistant reply carries citation chips pointing at either a stored fact or a published regulation,
+  and a <i>Generated</i> label. When a question implies a change — dropping a course, for example — the
+  reply stops being an answer and becomes a request: an inline panel states that the advisor must
+  approve it, with a link to the approval centre.
+</p>
+<figure>
+  <img src="assets/advisor.png" alt="AI academic advisor" />
+  <div class="figcap">Figure 4.3 — AI Academic Advisor: cited answers, provenance labels and the approval hand-off.</div>
+</figure>
+
+<h2 class="newpage">4.4 Arbiter Governance Centre</h2>
+<p>
+  <b>Purpose.</b> Hold every drafted action until a named human decides. The queue orders work by SLA
+  and risk class. The review pane shows the draft, the evidence behind it as fact-and-source pairs, the
+  reasoning, and the exact tables the action would write to if approved. The advisor may approve, edit
+  first and then approve, or reject with a mandatory reason; each decision produces a receipt and a
+  ledger entry, and the item moves to the decision history.
+</p>
+<figure>
+  <img src="assets/approvals.png" alt="Arbiter governance centre" />
+  <div class="figcap">Figure 4.4 — Arbiter: queue, evidence, blast radius, and the approve / edit / reject decision.</div>
+</figure>
+
+<h2 class="newpage">4.5 Fabric</h2>
+<p>
+  <b>Purpose.</b> Show where the signals come from before any reasoning begins. Four sources are
+  presented with connection state, record counts, last sync and their access mode — all read-only until
+  an approval path exists. The identity-resolution diagram shows four identifiers resolving to one
+  student before analysis starts, and the panel on this screen states plainly which parts are
+  illustrative.
+</p>
+<figure>
+  <img src="assets/fabric.png" alt="Fabric data sources" />
+  <div class="figcap">Figure 4.5 — Fabric: source health, identity resolution and sync activity.</div>
+</figure>
+
+<h2 class="newpage">4.6 Agent Graph</h2>
+<p>
+  <b>Purpose.</b> Make the relationships visible. The map is a view over the academic tables rather than
+  a second copy of them: enrolment, teaching and advising are derived at query time, so the map cannot
+  drift from the record. The panel beside it walks through how one change propagates — a mark slips, the
+  dependent subject lights up, the case re-scores, and a draft appears for approval.
+</p>
+<figure>
+  <img src="assets/graph.png" alt="Agent graph" />
+  <div class="figcap">Figure 4.6 — Agent Graph: the student's neighbourhood and the propagation of a single change.</div>
+</figure>
+
+<h2 class="newpage">4.7 Build Status</h2>
+<p>
+  <b>Purpose.</b> State what is real. This screen is part of the prototype deliberately: it lists each
+  milestone with its true state, and explains that the database exists while the interface does not yet
+  read from it. It is the page that prevents the demonstration from overstating itself.
+</p>
+<figure>
+  <img src="assets/status.png" alt="Build status" />
+  <div class="figcap">Figure 4.7 — Build status: implemented, designed and planned, stated plainly.</div>
+</figure>
+
+<h2>4.8 Screen Inventory</h2>
+<table class="t">
+  <thead>
+    <tr><th style="width:6%">No.</th><th style="width:24%">Screen</th><th style="width:22%">Route</th><th>Primary purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>Command Dashboard</td><td><code>/</code></td><td>Institution-wide triage and trend</td></tr>
+    <tr><td>2</td><td>Student Intelligence</td><td><code>/students/[id]</code></td><td>One student, explained</td></tr>
+    <tr><td>3</td><td>AI Academic Advisor</td><td><code>/advisor</code></td><td>Grounded, cited conversation</td></tr>
+    <tr><td>4</td><td>Arbiter Governance Centre</td><td><code>/approvals</code></td><td>Human decision over drafted actions</td></tr>
+    <tr><td>5</td><td>Fabric</td><td><code>/fabric</code></td><td>Sources, identity resolution, sync health</td></tr>
+    <tr><td>6</td><td>Agent Graph</td><td><code>/graph</code></td><td>Relationships and propagation</td></tr>
+    <tr><td>7</td><td>Build Status</td><td><code>/status</code></td><td>Honest state of the build</td></tr>
+  </tbody>
+</table>
+<div class="caption">Table 4.1 — The seven screens of the working prototype.</div>
+
+<h2>4.9 What Is Real and What Is Sample</h2>
+<table class="t">
+  <thead>
+    <tr><th style="width:46%">Element</th><th style="width:18%">State</th><th>Evidence</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>PostgreSQL schema, 17 tenant tables</td><td><span class="pill p-done">Real</span></td><td>Two migrations applied; revision <code>0002_academic_core</code></td></tr>
+    <tr><td>Row-level security and tenant keys</td><td><span class="pill p-done">Real</span></td><td>Asserted by the database test suite</td></tr>
+    <tr><td>Database test suite</td><td><span class="pill p-done">Real</span></td><td>50 tests in the database suite</td></tr>
+    <tr><td>Web interface</td><td><span class="pill p-proto">Prototype</span></td><td>Seven routes, builds and type-checks cleanly</td></tr>
+    <tr><td>Student names, marks, attendance</td><td><span class="pill p-plan">Sample</span></td><td>Seeded population of 1,284; deterministic and internally consistent</td></tr>
+    <tr><td>Aggregate figures on the dashboard</td><td><span class="pill p-plan">Derived</span></td><td>Computed from the population, not typed into the markup</td></tr>
+    <tr><td>Risk contributions shown on screen</td><td><span class="pill p-plan">Sample</span></td><td>Computed by the specified weighting, from sample features</td></tr>
+    <tr><td>Approval decisions</td><td><span class="pill p-plan">Simulated</span></td><td>Browser memory; resets on reload</td></tr>
+    <tr><td>Advisor conversation</td><td><span class="pill p-plan">Scripted</span></td><td>Keyword match; no model call</td></tr>
+    <tr><td>Authentication and sessions</td><td><span class="pill p-des">Designed</span></td><td>Not implemented</td></tr>
+    <tr><td>Audit ledger writer</td><td><span class="pill p-des">Designed</span></td><td>Not implemented</td></tr>
+    <tr><td>Risk engine and executor services</td><td><span class="pill p-des">Designed</span></td><td>Not implemented</td></tr>
+  </tbody>
+</table>
+<div class="caption">Table 4.2 — Implementation state of each element shown in this chapter.</div>
+
+<!-- ============================ CHAPTER 5 ============================ -->
+<h1 class="chapter"><span class="num">5</span>Conclusion</h1>
+<div class="accent"></div>
+<p>
+  UniSync AI began from a familiar observation: academic information is spread across systems that do
+  not talk to each other. The work described in this report takes that observation one step further.
+  Fragmentation is not only an inconvenience for the people who must visit four portals — it is the
+  reason a student in difficulty is noticed late, by chance, and without evidence.
+</p>
+<p>
+  The design therefore does two things at once. Fabric unifies the sources into one tenant-isolated
+  record, and the governance layer turns that record into a decision: a deterministic score that can be
+  re-derived, a draft intervention that carries its evidence, and a required human approval before
+  anything is written. Determinism and human authority were treated as non-negotiable constraints
+  rather than features, because an academic system that silently changes records, or that cannot
+  explain a number it produced, would not be trusted by the people expected to use it.
+</p>
+<p>
+  The prototype reached two different levels of maturity, and the report has been careful to keep them
+  apart. The relational core is complete and tested: seventeen tenant-scoped tables, row-level security
+  forced on every one, composite tenant keys that make cross-tenant references impossible, and fifty
+  automated tests. The interface is a presentation prototype of seven screens over sample data. It
+  demonstrates the intended experience — triage, explanation, governed decision — without claiming a
+  backend it does not yet have.
+</p>
+<p>
+  The remaining work is well defined rather than speculative: authentication and sessions, the
+  audit-ledger writer, the deterministic risk engine as a service, the agent runtime restricted to
+  proposals, and the executor services that perform approved writes. Each has a written specification
+  and a set of acceptance tests that must pass before it is claimed as complete. The prototype
+  demonstrates feasibility; the invariants described in Chapter 3 are the foundation on which the
+  remaining implementation can safely be built.
+</p>
+
+<!-- ============================ CHAPTER 6 ============================ -->
+<h1 class="chapter"><span class="num">6</span>References</h1>
+<div class="accent"></div>
+
+<h3>Research and reference systems</h3>
+<ul>
+  <li>IEEE Xplore Digital Library — research papers on academic management and student information
+      systems.</li>
+  <li>ScienceDirect — literature on educational technology and early-alert systems.</li>
+  <li>Risely AI (reference study) — https://www.ycombinator.com/companies/risely-ai</li>
+  <li>MIT Academy of Engineering ERP portal (reference).</li>
+  <li>Moodle Learning Management System (reference).</li>
+</ul>
+
+<h3>Documentation</h3>
+<ul>
+  <li>PostgreSQL 16 Documentation — Row Security Policies.</li>
+  <li>Next.js 15 Documentation — App Router.</li>
+  <li>FastAPI Documentation.</li>
+  <li>SQLAlchemy 2.0 and Alembic Documentation — schema migrations.</li>
+  <li>Docker Compose Documentation.</li>
+</ul>
+
+<h3>Tools</h3>
+<ul>
+  <li>Lucidchart, https://www.lucidchart.com</li>
+  <li>Canva, https://www.canva.com</li>
+  <li>Visual Studio Code, Git and GitHub.</li>
+</ul>
+
+<div style="margin-top:26pt; border-top:0.8pt solid #cbd5e1; padding-top:10pt; font-size:8.6pt; color:#64748b;">
+  This report describes the system as implemented at the time of writing. Statements of status —
+  <i>implemented</i>, <i>prototype</i>, <i>designed</i>, <i>planned</i> — correspond to Table 4.2 and
+  are intended to be verifiable against the repository.
+</div>
+
+</body>
+</html>

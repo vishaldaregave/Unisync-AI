@@ -1,0 +1,20 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1] ?? "") : "";
+  return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
+}
+
+export function pct(value: number, digits = 0): string {
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+export const DEMO_NOTICE =
+  "Prototype — sample data. No live database, no model calls, no executed actions.";

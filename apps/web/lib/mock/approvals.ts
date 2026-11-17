@@ -1,0 +1,165 @@
+import type { ApprovalRecord, ProposedAction } from "./types";
+
+export const proposedActions: ProposedAction[] = [
+  {
+    id: "act_1042",
+    kind: "send_message",
+    studentId: "aarav-menon",
+    studentName: "Aarav Menon",
+    title: "Contact Aarav Menon about CS301 attendance",
+    draft:
+      "Hi Aarav — your CS301 attendance is at 62% (13 of 21 sessions). The course needs 75% to sit the final, so you are three sessions short. If you attend Tuesday and Thursday this week you reach 71%, and the following week clears it. Want me to hold a slot with Dr. Iyer?",
+    rationale:
+      "Attendance-driven risk (78, high). Three unexcused absences in the last 14 days, and the final-exam eligibility floor is 75%.",
+    evidence: [
+      { key: "attendance.rate", label: "CS301 attendance", value: "62% (13/21)", source: "attendance_records" },
+      { key: "attendance.streak", label: "Unexcused absences, 14 days", value: "3", source: "attendance_records" },
+      { key: "policy.floor", label: "Exam eligibility floor", value: "75%", source: "Academic Regulations 2026 §4.2" },
+      { key: "risk.contributions", label: "Attendance contribution", value: "+30.6 of 78", source: "risk_indicators" },
+    ],
+    confidence: 0.81,
+    riskClass: "medium",
+    slaDueAt: "2026-11-17T18:00:00+05:30",
+    assignee: "Dr. R. Okafor",
+    blastRadius: [
+      { table: "interventions", effect: "create", rows: 1 },
+      { table: "notifications", effect: "create", rows: 1 },
+      { table: "audit_logs", effect: "append", rows: 1 },
+    ],
+  },
+  {
+    id: "act_1041",
+    kind: "create_support_referral",
+    studentId: "neha-kulkarni",
+    studentName: "Neha Kulkarni",
+    title: "Refer Neha Kulkarni to the tutoring centre",
+    draft:
+      "Referral: Neha has missed three labs in CS302 and her weighted mark is 41%. Requesting two weekly sessions with the departmental tutor, prioritising the two remaining lab assessments.",
+    rationale:
+      "Two independent signals plus a closing window. Tutoring is the smallest intervention that addresses both the missed labs and the mark trajectory.",
+    evidence: [
+      { key: "submissions.missing", label: "Missing labs (CS302)", value: "3", source: "submissions" },
+      { key: "marks.weighted", label: "Weighted mark", value: "41%", source: "marks" },
+      { key: "tutoring.slots", label: "Available tutoring slots", value: "Wed 15:00, Fri 10:00", source: "support_catalogue" },
+    ],
+    confidence: 0.76,
+    riskClass: "high",
+    slaDueAt: "2026-11-17T12:00:00+05:30",
+    assignee: "Dr. R. Okafor",
+    blastRadius: [
+      { table: "interventions", effect: "create", rows: 1 },
+      { table: "followup_tasks", effect: "create", rows: 1 },
+      { table: "audit_logs", effect: "append", rows: 1 },
+    ],
+  },
+  {
+    id: "act_1040",
+    kind: "schedule_appointment",
+    studentId: "kabir-shah",
+    studentName: "Kabir Shah",
+    title: "Hold a Thursday advising slot for Kabir Shah",
+    draft:
+      "Hold Thursday 14:00 with Dr. Okafor, 30 minutes. Reason: two missed assessments in CS302 and a mark drop of 14 points since the midterm.",
+    rationale: "Assessment-driven risk (71, high) with an open case and no contact logged in 11 days.",
+    evidence: [
+      { key: "assessments.missed", label: "Missed assessments", value: "2", source: "marks" },
+      { key: "contact.last", label: "Last advisor contact", value: "11 days ago", source: "interventions" },
+      { key: "availability.slot", label: "Advisor availability", value: "Thu 14:00", source: "faculty.office_hours" },
+    ],
+    confidence: 0.72,
+    riskClass: "medium",
+    slaDueAt: "2026-11-18T12:00:00+05:30",
+    assignee: "Dr. R. Okafor",
+    blastRadius: [
+      { table: "interventions", effect: "create", rows: 1 },
+      { table: "notifications", effect: "create", rows: 1 },
+      { table: "audit_logs", effect: "append", rows: 1 },
+    ],
+  },
+  {
+    id: "act_1039",
+    kind: "send_message",
+    studentId: "ishan-rao",
+    studentName: "Ishan Rao",
+    title: "Check in with Ishan Rao on lab attendance",
+    draft:
+      "Hi Ishan — two of your lab sections are at 74% attendance. Nothing urgent, but the lab component needs 80% for the practical grade. Is there a timetable clash we should know about?",
+    rationale: "Attendance-driven signal (57, medium) below the intervention threshold but trending down for three weeks.",
+    evidence: [
+      { key: "attendance.rate", label: "Lab attendance", value: "74%", source: "attendance_records" },
+      { key: "attendance.trend", label: "Trend, 3 weeks", value: "−6 pts", source: "attendance_records" },
+    ],
+    confidence: 0.68,
+    riskClass: "low",
+    slaDueAt: "2026-11-19T12:00:00+05:30",
+    assignee: "Dr. P. Nair",
+    blastRadius: [
+      { table: "interventions", effect: "create", rows: 1 },
+      { table: "audit_logs", effect: "append", rows: 1 },
+    ],
+  },
+  {
+    id: "act_1038",
+    kind: "create_followup_task",
+    studentId: "diya-sharma",
+    studentName: "Diya Sharma",
+    title: "Follow up on Diya Sharma's missed deadline",
+    draft:
+      "Task for Dr. Fernandes: confirm whether the ME310 design review can be resubmitted. Student has a documented medical absence for the original date.",
+    rationale: "One signal, already explained by an approved absence. Task routes to the subject faculty rather than the advisor.",
+    evidence: [
+      { key: "submissions.missing", label: "Missing submission", value: "ME310 design review", source: "submissions" },
+      { key: "absence.approved", label: "Approved absence", value: "Nov 4 – Nov 6", source: "attendance_records" },
+    ],
+    confidence: 0.64,
+    riskClass: "low",
+    slaDueAt: "2026-11-20T12:00:00+05:30",
+    assignee: "Dr. M. Fernandes",
+    blastRadius: [{ table: "followup_tasks", effect: "create", rows: 1 }],
+  },
+];
+
+export const decisionHistory: ApprovalRecord[] = [
+  {
+    id: "dec_3312",
+    actionId: "act_1031",
+    actionTitle: "Contact Neha Kulkarni about lab attendance",
+    studentName: "Neha Kulkarni",
+    decidedBy: "Dr. R. Okafor",
+    decidedAt: "2026-11-16T14:32:00+05:30",
+    decision: "edited",
+    reason: "Softened the opening line before sending.",
+    auditEntry: "A-1042",
+  },
+  {
+    id: "dec_3311",
+    actionId: "act_1029",
+    actionTitle: "Hold an advising slot for Ishan Rao",
+    studentName: "Ishan Rao",
+    decidedBy: "Dr. P. Nair",
+    decidedAt: "2026-11-16T11:18:00+05:30",
+    decision: "approved",
+    auditEntry: "A-1041",
+  },
+  {
+    id: "dec_3310",
+    actionId: "act_1027",
+    actionTitle: "Refer Kabir Shah to counselling",
+    studentName: "Kabir Shah",
+    decidedBy: "Dr. R. Okafor",
+    decidedAt: "2026-11-15T16:22:00+05:30",
+    decision: "rejected",
+    reason: "Duplicate of an existing open case; handled directly instead.",
+    auditEntry: "A-1040",
+  },
+  {
+    id: "dec_3309",
+    actionId: "act_1024",
+    actionTitle: "Send attendance nudge to Meera Iyer",
+    studentName: "Meera Iyer",
+    decidedBy: "Dr. S. Iyer",
+    decidedAt: "2026-11-15T09:41:00+05:30",
+    decision: "approved",
+    auditEntry: "A-1039",
+  },
+];
